@@ -7,8 +7,8 @@ Prerequisites
 -------------
 - .NET 8 SDK
 
-Build and Run
--------------
+Build and Run (Console)
+-----------------------
 1. Build:
    ```bash
    dotnet build
@@ -18,16 +18,24 @@ Build and Run
    dotnet run --project MetalStorming20.csproj
    ```
 
+Web App (Blazor WebAssembly)
+----------------------------
+- Start the dev server:
+  ```bash
+  dotnet run --project MetalStorming20.Web/MetalStorming20.Web.csproj --urls http://localhost:5173
+  ```
+- Open `http://localhost:5173` in your browser.
+
 Usage
 -----
-Follow the prompts:
+Enter:
 - Current Plane Level (1-20)
 - Current Mastery Level (1-23)
 - Current Universal Parts
 - Current Silver
-- Target Mastery Level (press Enter for 23)
+- Target Mastery Level (default 23)
 
-Optionally, choose to print per-upgrade breakdown.
+Optionally, expand the per-upgrade breakdown.
 
 Testing
 -------
@@ -38,7 +46,7 @@ dotnet test
 
 CI
 --
-This repo includes a GitHub Actions workflow that builds and runs tests on pushes and PRs to `main`.
+GitHub Actions workflow builds and tests on pushes/PRs to `main`.
 
 License
 -------

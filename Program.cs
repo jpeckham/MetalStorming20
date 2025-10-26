@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using MetalStorming20.Core;
 
 class Program
 {
@@ -53,15 +54,15 @@ class Program
         int targetMasteryLevel = string.IsNullOrWhiteSpace(targetStr) ? 23 : Clamp(ParseIntOrDefault(targetStr, 23), 1, 23);
 
         // 1) Compute total need from current plane level -> 20
-        var (needParts, needSilver) = NeedToLevel20(currentPlaneLevel);
+        var (needParts, needSilver) = Planner.NeedToLevel20(currentPlaneLevel);
 
         // 2) Subtract banked resources
         int shortPartsAfterBank = Math.Max(0, needParts - currentParts);
         int shortSilverAfterBank = Math.Max(0, needSilver - currentSilver);
 
         // 3) Project future mastery rewards from (currentMasteryLevel+1) to target
-        var (nonGoldParts, nonGoldSilver) = FutureMasteryRewards(currentMasteryLevel, targetMasteryLevel, includeGold: false);
-        var (goldParts, goldSilver) = FutureMasteryRewards(currentMasteryLevel, targetMasteryLevel, includeGold: true);
+        var (nonGoldParts, nonGoldSilver) = Planner.FutureMasteryRewards(currentMasteryLevel, targetMasteryLevel, includeGold: false);
+        var (goldParts, goldSilver) = Planner.FutureMasteryRewards(currentMasteryLevel, targetMasteryLevel, includeGold: true);
 
         // 4) Shortfall after applying future mastery (No-Gold / With-Gold)
         var shortNoGoldParts = Math.Max(0, shortPartsAfterBank - nonGoldParts);
@@ -103,19 +104,7 @@ class Program
     /// </summary>
     /// <param name="currentPlaneLevel">The current plane level (1-20).</param>
     /// <returns>Tuple where Item1 is required parts and Item2 is required silver.</returns>
-    internal static (int needParts, int needSilver) NeedToLevel20(int currentPlaneLevel)
-    {
-        if (currentPlaneLevel >= 20) return (0, 0);
-        // Sum indices from currentPlaneLevel-1 to 18
-        int startIndex = Math.Max(0, currentPlaneLevel - 1);
-        int parts = 0, silver = 0;
-        for (int i = startIndex; i < PartsPerUpgrade.Length; i++)
-        {
-            parts += PartsPerUpgrade[i];
-            silver += SilverPerUpgrade[i];
-        }
-        return (parts, silver);
-    }
+    
 
     /// <summary>
     /// Computes the cumulative mastery rewards (parts and silver) obtained by
@@ -126,26 +115,7 @@ class Program
     /// <param name="targetMastery">Target mastery level (1-23).</param>
     /// <param name="includeGold">Whether to include gold-only mastery bonuses.</param>
     /// <returns>Tuple of (parts, silver) earned from mastery progression.</returns>
-    internal static (int parts, int silver) FutureMasteryRewards(int currentMastery, int targetMastery, bool includeGold)
-    {
-        if (targetMastery <= currentMastery) return (0, 0);
-
-        int parts = 0, silver = 0;
-        for (int m = currentMastery + 1; m <= targetMastery; m++)
-        {
-            if (MasteryNonGold.TryGetValue(m, out var baseReward))
-            {
-                parts += baseReward.parts;
-                silver += baseReward.silver;
-            }
-            if (includeGold && MasteryGoldBonus.TryGetValue(m, out var gold))
-            {
-                parts += gold.parts;
-                silver += gold.silver;
-            }
-        }
-        return (parts, silver);
-    }
+    
 
     /// <summary>
     /// Prints a per-upgrade breakdown of required parts and silver for each step
