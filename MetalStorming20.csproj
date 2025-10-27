@@ -15,6 +15,12 @@
 
   <ItemGroup>
     <Compile Remove="MetalStorming20.Tests\**\*.cs" />
+    <Compile Remove="MetalStorming20.Core\**\*.cs" />
+    <Compile Remove="MetalStorming20.Web\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="MetalStorming20.Core\MetalStorming20.Core.csproj" />
   </ItemGroup>
 
 </Project>
