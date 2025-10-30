@@ -2,10 +2,6 @@
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
-/bin/Debug/net8.0
-/MetalStorming20.Core/bin/Debug/net8.0
-/MetalStorming20.Core/obj
-/MetalStorming20.Tests/bin/Debug/net8.0
-/MetalStorming20.Tests/obj/Debug/net8.0
-/MetalStorming20.Tests/obj
+/**/obj/**/*
+/**/bin/**/*
 /obj
