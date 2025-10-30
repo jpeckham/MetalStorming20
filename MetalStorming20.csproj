@@ -14,9 +14,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="MetalStorming20.Tests\**\*.cs" />
-    <Compile Remove="MetalStorming20.Core\**\*.cs" />
-    <Compile Remove="MetalStorming20.Web\**\*.cs" />
+    <Compile Remove="MetalStorming20.Core\**" />
+    <Compile Remove="MetalStorming20.Tests\**" />
+    <EmbeddedResource Remove="MetalStorming20.Core\**" />
+    <EmbeddedResource Remove="MetalStorming20.Tests\**" />
+    <None Remove="MetalStorming20.Core\**" />
+    <None Remove="MetalStorming20.Tests\**" />
   </ItemGroup>
 
   <ItemGroup>
