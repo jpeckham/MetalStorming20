@@ -1,5 +1,6 @@
 using Microsoft.Playwright;
 using Microsoft.Playwright.MSTest;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace MetalStorming20.PlaywrightTests;
 
