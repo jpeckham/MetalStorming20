@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redirecting…</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; }
+    </style>
+    <script>
+        (function () {
+            const locationHref = window.location.href;
+            const pathSegments = window.location.pathname.split('/').filter(Boolean);
+            const repoSegment = pathSegments.length ? `/${pathSegments[0]}/` : '/';
+            sessionStorage.redirect = locationHref;
+            window.location.replace(repoSegment);
+        })();
+    </script>
+</head>
+<body>
+    <p>Redirecting to the app…</p>
+</body>
+</html>
