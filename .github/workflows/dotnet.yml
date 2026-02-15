@@ -20,6 +20,6 @@ jobs:
       - name: Build
         run: dotnet build MetalStorming20.sln --configuration Release --no-restore
       - name: Test
-        run: dotnet test MetalStorming20.Tests/MetalStorming20.Tests.csproj --no-build --verbosity normal
+        run: dotnet test MetalStorming20.Tests/MetalStorming20.Tests.csproj --configuration Release --no-build --verbosity normal
 
 
