@@ -31,9 +31,11 @@ jobs:
         run: |
           dotnet publish MetalStorming20.Web/MetalStorming20.Web.csproj \
             -c Release \
-            -o build_output \
-            /p:BaseHref=/${{ github.event.repository.name }}/ \
-            /p:StaticWebAssetBasePath=/${{ github.event.repository.name }}/
+            -o build_output
+      - name: Configure app base path for GitHub Pages
+        run: |
+          REPO_NAME="${{ github.event.repository.name }}"
+          sed -i "s|<base href=\"/\" />|<base href=\"/$REPO_NAME/\" />|g" build_output/wwwroot/index.html
       - name: Disable Jekyll processing
         run: touch build_output/wwwroot/.nojekyll
       - name: Upload artifact
