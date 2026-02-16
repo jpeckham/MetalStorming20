@@ -26,6 +26,16 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>
     </div>
+    <script>
+        (function () {
+            const redirect = sessionStorage.redirect;
+            if (redirect) {
+                sessionStorage.removeItem('redirect');
+                const url = new URL(redirect);
+                window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+            }
+        })();
+    </script>
     <script src="_framework/blazor.webassembly.js"></script>
 </body>
 

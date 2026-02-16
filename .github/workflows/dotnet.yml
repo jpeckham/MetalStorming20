@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Setup .NET
@@ -19,7 +19,28 @@ jobs:
         run: dotnet restore MetalStorming20.sln
       - name: Build
         run: dotnet build MetalStorming20.sln --configuration Release --no-restore
-      - name: Test
-        run: dotnet test MetalStorming20.sln --no-build --verbosity normal
-
-
+      - name: Install Playwright browsers
+        run: pwsh MetalStorming20.PlaywrightTests/bin/Release/net8.0/playwright.ps1 install --with-deps
+      - name: Start web app for integration tests
+        run: |
+          dotnet run --project MetalStorming20.Web/MetalStorming20.Web.csproj --configuration Release --urls http://127.0.0.1:5000 > /tmp/web.log 2>&1 &
+          echo $! > /tmp/web.pid
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:5000 >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Web app failed to start"
+          cat /tmp/web.log
+          exit 1
+      - name: Test (all projects)
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:5000/
+        run: dotnet test MetalStorming20.sln --configuration Release --no-build --verbosity normal
+      - name: Stop web app
+        if: always()
+        run: |
+          if [ -f /tmp/web.pid ]; then
+            kill "$(cat /tmp/web.pid)" || true
+          fi
