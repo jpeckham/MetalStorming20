@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "MetalStorming20.PlaywrightTests": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "PLAYWRIGHT_BASE_URL": "http://localhost:5193"
+      }
+    }
+  }
+}

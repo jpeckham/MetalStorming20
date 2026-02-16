@@ -10,7 +10,7 @@ public class PlannerPageTests : PageTest
     private string BaseUrl =>
         Environment.GetEnvironmentVariable("PLAYWRIGHT_BASE_URL") ??
         TestContext.Properties["BaseUrl"] as string ??
-        "http://localhost:5000/";
+        throw new NullReferenceException("BaseURL");
 
     [TestMethod]
     public async Task HomePageLoadsAndCalculates()
