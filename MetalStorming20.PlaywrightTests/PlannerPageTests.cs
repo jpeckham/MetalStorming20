@@ -19,11 +19,13 @@ public class PlannerPageTests : PageTest
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "MetalStorm Planner" })).ToBeVisibleAsync();
 
-        await Page.GetByLabel("Current Plane Level (1-20)").FillAsync("5");
-        await Page.GetByLabel("Current Mastery Level (1-23)").FillAsync("3");
-        await Page.GetByLabel("Target Mastery Level (1-23)").FillAsync("6");
-        await Page.GetByLabel("Current Universal Parts").FillAsync("2000");
-        await Page.GetByLabel("Current Silver").FillAsync("500000");
+        var numericInputs = Page.Locator("input.form-control[type='number']");
+        await Expect(numericInputs).ToHaveCountAsync(5);
+        await numericInputs.Nth(0).FillAsync("5");
+        await numericInputs.Nth(1).FillAsync("3");
+        await numericInputs.Nth(2).FillAsync("6");
+        await numericInputs.Nth(3).FillAsync("2000");
+        await numericInputs.Nth(4).FillAsync("500000");
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Calculate Requirements" }).ClickAsync();
 
