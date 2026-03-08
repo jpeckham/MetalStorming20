@@ -23,5 +23,6 @@ jobs:
       start_marker: '<!-- badges:start -->'
       end_marker: '<!-- badges:end -->'
       coverage_badge_path: .github/badges/coverage.svg
+      coverage_link_url: https://jpeckham.github.io/MetalStorming20/coverage/
       main_branch: main
     secrets: inherit

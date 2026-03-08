@@ -4,7 +4,7 @@
 ## Status Badges
 
 [![Continuous Delivery](https://github.com/jpeckham/MetalStorming20/actions/workflows/continuous-delivery-dotnet-blazor-github-pages.yml/badge.svg)](https://github.com/jpeckham/MetalStorming20/actions/workflows/continuous-delivery-dotnet-blazor-github-pages.yml)
-[![Coverage](.github/badges/coverage.svg)](https://github.com/jpeckham/MetalStorming20/releases/latest/download/coverage-report.zip)
+[![Coverage](.github/badges/coverage.svg)](https://jpeckham.github.io/MetalStorming20/coverage/)
 <!-- badges:end -->
 
 MetalStorm Planner is a Blazor WebAssembly app that helps MetalStorm players forecast the parts and silver needed to finish upgrading a plane, and the mastery rewards that offset those costs. The UI is static and GitHub Pages–friendly, so it can be published directly from the generated `wwwroot` artifacts without a backend server.
