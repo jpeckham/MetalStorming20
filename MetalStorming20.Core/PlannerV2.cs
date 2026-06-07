@@ -12,7 +12,19 @@ public enum PlanStepScope
     System
 }
 
+public enum GoldMasteryStatus
+{
+    Off,
+    Owned,
+    Planned
+}
+
 public sealed record CurrencyAmountV2(string CurrencyCode, int Amount);
+
+public sealed record MasteryPlanV2(
+    int CurrentMasteryLevel,
+    int PlannedMasteryLevel,
+    GoldMasteryStatus GoldStatus);
 
 public sealed record UpgradeCostRowV2(
     string UpgradeKind,
@@ -56,7 +68,8 @@ public sealed record PlannerRequestV2(
     IReadOnlyList<ResourceBalanceV2> ResourceBalances,
     IReadOnlyList<AircraftTargetV2> AircraftTargets,
     IReadOnlyList<SystemTargetV2> SystemTargets,
-    IReadOnlyList<SystemSlotDefinitionV2> SystemSlots);
+    IReadOnlyList<SystemSlotDefinitionV2> SystemSlots,
+    MasteryPlanV2? MasteryPlan = null);
 
 public sealed record PlanStepV2(
     int Order,
@@ -72,7 +85,9 @@ public sealed record PlannerResultV2(
     IReadOnlyList<string> Warnings,
     IReadOnlyList<CurrencyAmountV2> TotalsRequired,
     IReadOnlyList<CurrencyAmountV2> Deficits,
-    IReadOnlyList<PlanStepV2> Steps);
+    IReadOnlyList<PlanStepV2> Steps,
+    IReadOnlyList<CurrencyAmountV2> MasteryRebate,
+    IReadOnlyList<CurrencyAmountV2> NetGrindNeeded);
 
 public static class PlannerV2
 {
@@ -152,6 +167,31 @@ public static class PlannerV2
         SystemRow(7, 8, 7000, 3000, 1, "MEDIUM_HIGH")
     ];
 
+    private static readonly Dictionary<int, (int aircraftParts, int silver)> MasteryNonGoldRewards = new()
+    {
+        { 1,  (100, 0) },
+        { 3,  (150, 0) },
+        { 5,  (0, 700) },
+        { 7,  (0, 900) },
+        { 11, (250, 0) },
+        { 13, (300, 0) },
+        { 15, (350, 0) },
+        { 17, (0, 1200) },
+        { 19, (0, 1600) },
+        { 21, (400, 0) },
+        { 23, (450, 0) }
+    };
+
+    private static readonly Dictionary<int, (int aircraftParts, int silver)> MasteryGoldRewards = new()
+    {
+        { 2,  (0, 1500) },
+        { 6,  (1000, 0) },
+        { 10, (0, 2500) },
+        { 14, (0, 3500) },
+        { 18, (2000, 0) },
+        { 22, (0, 5000) }
+    };
+
     public static IReadOnlyList<UpgradeCostRowV2> AllUpgradeCosts =>
         AircraftCosts.Concat(SystemCosts).ToArray();
 
@@ -196,7 +236,7 @@ public static class PlannerV2
         var warnings = Validate(request);
         if (warnings.Count > 0)
         {
-            return new PlannerResultV2(warnings, [], [], []);
+            return new PlannerResultV2(warnings, [], [], [], [], []);
         }
 
         var steps = new List<PlanStepV2>();
@@ -275,7 +315,9 @@ public static class PlannerV2
 
         var totals = TotalsFor(steps);
         var deficits = DeficitsFor(totals, request.ResourceBalances);
-        return new PlannerResultV2([], totals, deficits, steps);
+        var masteryRebate = MasteryRebateFor(request.MasteryPlan);
+        var netGrindNeeded = NetGrindNeededFor(deficits, masteryRebate);
+        return new PlannerResultV2([], totals, deficits, steps, masteryRebate, netGrindNeeded);
     }
 
     private static List<string> Validate(PlannerRequestV2 request)
@@ -489,6 +531,61 @@ public static class PlannerV2
         }
 
         return SortCurrencyAmounts(deficits);
+    }
+
+    private static IReadOnlyList<CurrencyAmountV2> MasteryRebateFor(MasteryPlanV2? masteryPlan)
+    {
+        if (masteryPlan is null)
+        {
+            return [];
+        }
+
+        var currentLevel = Math.Clamp(masteryPlan.CurrentMasteryLevel, 1, 24);
+        var plannedLevel = Math.Clamp(masteryPlan.PlannedMasteryLevel, currentLevel, 24);
+        var totals = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        for (var level = currentLevel + 1; level <= plannedLevel; level++)
+        {
+            if (MasteryNonGoldRewards.TryGetValue(level, out var reward))
+            {
+                Add(totals, Currencies.AircraftParts, reward.aircraftParts);
+                Add(totals, Currencies.Silver, reward.silver);
+            }
+        }
+
+        if (masteryPlan.GoldStatus is GoldMasteryStatus.Owned or GoldMasteryStatus.Planned)
+        {
+            for (var level = currentLevel + 1; level <= plannedLevel; level++)
+            {
+                if (MasteryGoldRewards.TryGetValue(level, out var reward))
+                {
+                    Add(totals, Currencies.AircraftParts, reward.aircraftParts);
+                    Add(totals, Currencies.Silver, reward.silver);
+                }
+            }
+        }
+
+        return SortCurrencyAmounts(totals);
+    }
+
+    private static IReadOnlyList<CurrencyAmountV2> NetGrindNeededFor(
+        IReadOnlyList<CurrencyAmountV2> deficits,
+        IReadOnlyList<CurrencyAmountV2> masteryRebate)
+    {
+        var rebateByCurrency = masteryRebate.ToDictionary(r => r.CurrencyCode, r => r.Amount, StringComparer.OrdinalIgnoreCase);
+        var net = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var deficit in deficits)
+        {
+            rebateByCurrency.TryGetValue(deficit.CurrencyCode, out var rebate);
+            var amount = Math.Max(0, deficit.Amount - rebate);
+            if (amount > 0)
+            {
+                net[deficit.CurrencyCode] = amount;
+            }
+        }
+
+        return SortCurrencyAmounts(net);
     }
 
     private static IReadOnlyList<CurrencyAmountV2> SortCurrencyAmounts(IDictionary<string, int> values)

@@ -13,10 +13,6 @@
     Green owned nodes are your current state. Blue desired nodes are your target state. Costs are calculated for the gap between owned and desired. If you jump to a branch node such as 7A without an owned path before it, the planner marks the required prior path green automatically.
 </div>
 
-<div class="alert alert-secondary py-2" role="status">
-    Browser state schema version 2. Static catalog version 2026-06-06.
-</div>
-
 <section class="border rounded p-3">
     <h2 class="h5">Aircraft Level</h2>
     <div class="level-grid" role="group" aria-label="Aircraft level nodes">
@@ -24,6 +20,21 @@
         {
             <button type="button" class="@AircraftLevelButtonClass(level)" data-state="@AircraftLevelStateValue(level)" aria-pressed="@aircraftLevelPlan.IsTarget(level).ToString().ToLowerInvariant()" @onclick="() => CycleAircraftLevel(level)">@level</button>
         }
+    </div>
+</section>
+
+<section class="border rounded p-3 mt-3">
+    <h2 class="h5">Mastery</h2>
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <button type="button" class="@GoldMasteryButtonClass()" data-state="@GoldMasteryStateValue()" aria-pressed="@((goldMasteryStatus != GoldMasteryStatus.Off).ToString().ToLowerInvariant())" @onclick="CycleGoldMasteryStatus">Gold</button>
+    </div>
+    <div>
+        <div class="level-grid" role="group" aria-label="Mastery level nodes">
+            @foreach (var level in MasteryLevels)
+            {
+                <button type="button" class="@MasteryLevelButtonClass(level)" data-state="@MasteryLevelStateValue(level)" aria-pressed="@masteryLevelPlan.IsTarget(level).ToString().ToLowerInvariant()" @onclick="() => CycleMasteryLevel(level)">@level</button>
+            }
+        </div>
     </div>
 </section>
 
@@ -89,6 +100,12 @@
         line-height: 1;
     }
 
+    .gold-toggle {
+        width: auto;
+        min-width: 4.5rem;
+        padding-inline: 0.75rem;
+    }
+
     .node-toggle.desired {
         background: #0d6efd;
         border-color: #0d6efd;
@@ -142,6 +159,34 @@
                     }
                 </div>
             </div>
+            @if (result.MasteryRebate.Count > 0)
+            {
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        <h3 class="h5">Mastery Rebate</h3>
+                        @foreach (var rebate in result.MasteryRebate)
+                        {
+                            <div>@rebate.CurrencyCode @rebate.Amount.ToString("N0")</div>
+                        }
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100" data-testid="net-grind-needed">
+                        <h3 class="h5">Net Grind Needed</h3>
+                        @if (result.NetGrindNeeded.Count == 0)
+                        {
+                            <div>None</div>
+                        }
+                        else
+                        {
+                            @foreach (var net in result.NetGrindNeeded)
+                            {
+                                <div>@net.CurrencyCode @net.Amount.ToString("N0")</div>
+                            }
+                        }
+                    </div>
+                </div>
+            }
         </div>
 
         <div class="row g-3 mt-1">
@@ -193,10 +238,13 @@
 
 @code {
     private const string StorageKey = "metalstorming20.upgrades2.state";
+    private static readonly JsonSerializerOptions LocalStateJsonOptions = new(JsonSerializerDefaults.Web);
 
     private IReadOnlyList<SystemSlotDefinitionV2> systemSlots = PlannerV2.GenericSystemSlots;
     private readonly List<SystemPlanRow> systemPlans = [];
     private readonly AircraftLevelPlan aircraftLevelPlan = AircraftLevelPlan.FromLevels(5, 5);
+    private readonly MasteryLevelPlan masteryLevelPlan = MasteryLevelPlan.FromLevels(1, 1);
+    private GoldMasteryStatus goldMasteryStatus = GoldMasteryStatus.Off;
 
     private int currentAircraftLevel => aircraftLevelPlan.CurrentAircraftLevel;
     private int targetAircraftLevel => aircraftLevelPlan.TargetAircraftLevel;
@@ -204,6 +252,7 @@
     private PlannerResultV2? result;
     private string? exportText;
     private string currencyFilter = "";
+    private bool localStateLoaded;
 
     private static readonly string[] CurrencyCodes =
     [
@@ -219,6 +268,7 @@
     ];
     private static readonly int[] BranchLevels = [5, 6, 7, 8];
     private static readonly int[] AircraftLevels = Enumerable.Range(1, 20).ToArray();
+    private static readonly int[] MasteryLevels = Enumerable.Range(1, 24).ToArray();
 
     private IEnumerable<PlanStepV2> FilteredSteps => result?.Steps
         .Where(s => string.IsNullOrEmpty(currencyFilter) || s.Costs.Any(c => c.CurrencyCode == currencyFilter))
@@ -245,24 +295,32 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
+        if (localStateLoaded || systemPlans.Count == 0)
         {
             return;
         }
 
+        localStateLoaded = true;
         var saved = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
         if (string.IsNullOrWhiteSpace(saved))
         {
             return;
         }
 
-        var state = JsonSerializer.Deserialize<Upgrades2LocalState>(saved);
+        var state = JsonSerializer.Deserialize<Upgrades2LocalState>(saved, LocalStateJsonOptions);
         if (state?.SchemaVersion != 2)
         {
             return;
         }
 
         aircraftLevelPlan.LoadLevels(state.CurrentAircraftLevel, state.TargetAircraftLevel);
+        masteryLevelPlan.LoadLevels(state.CurrentMasteryLevel, state.PlannedMasteryLevel);
+        if (!string.IsNullOrWhiteSpace(state.GoldMasteryStatus) &&
+            Enum.TryParse<GoldMasteryStatus>(state.GoldMasteryStatus, ignoreCase: true, out var parsed))
+        {
+            goldMasteryStatus = parsed;
+        }
+
         foreach (var savedSystem in state.SystemPlans ?? [])
         {
             var row = systemPlans.FirstOrDefault(p => p.SystemSlotId == savedSystem.SystemSlotId);
@@ -341,6 +399,8 @@
             "",
             "## Target",
             $"- Aircraft level: {currentAircraftLevel}->{targetAircraftLevel}",
+            $"- Mastery level: {masteryLevelPlan.CurrentMasteryLevel}->{masteryLevelPlan.PlannedMasteryLevel}",
+            $"- Gold mastery: {goldMasteryStatus}",
             "",
             "## System Tracks"
         };
@@ -349,6 +409,12 @@
         lines.Add("");
         lines.Add("## Totals Required");
         lines.AddRange(result.TotalsRequired.Select(t => $"- {t.CurrencyCode}: {t.Amount:N0}"));
+        lines.Add("");
+        lines.Add("## Mastery Rebate");
+        lines.AddRange(result.MasteryRebate.Count == 0 ? ["- None"] : result.MasteryRebate.Select(t => $"- {t.CurrencyCode}: {t.Amount:N0}"));
+        lines.Add("");
+        lines.Add("## Net Grind Needed");
+        lines.AddRange(result.NetGrindNeeded.Count == 0 ? ["- None"] : result.NetGrindNeeded.Select(t => $"- {t.CurrencyCode}: {t.Amount:N0}"));
         lines.Add("");
         lines.Add("## Purchase Steps");
         lines.AddRange(result.Steps.Select(s => $"- {s.Order}. {DisplayStepGroup(s.SystemSlotId ?? "aircraft")} {s.FromLevel}->{s.ToLevel}: {string.Join(", ", s.Costs.Select(c => $"{c.CurrencyCode} {c.Amount:N0}"))}"));
@@ -369,8 +435,15 @@
                 p.TargetSystemLevel,
                 p.BranchOwnershipMode,
                 BuildBranchTargets(p))).ToArray(),
-            SystemSlots: systemSlots);
+            SystemSlots: systemSlots,
+            MasteryPlan: BuildMasteryPlan());
     }
+
+    private MasteryPlanV2 BuildMasteryPlan() =>
+        new(
+            masteryLevelPlan.CurrentMasteryLevel,
+            masteryLevelPlan.PlannedMasteryLevel,
+            goldMasteryStatus);
 
     private static IReadOnlyDictionary<int, string>? BuildBranchTargets(SystemPlanRow row)
     {
@@ -396,14 +469,18 @@
             2,
             currentAircraftLevel,
             targetAircraftLevel,
-            systemPlans.Select(SystemPlanState.FromRow).ToArray());
+            systemPlans.Select(SystemPlanState.FromRow).ToArray(),
+            masteryLevelPlan.CurrentMasteryLevel,
+            masteryLevelPlan.PlannedMasteryLevel,
+            goldMasteryStatus.ToString());
 
-        await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, JsonSerializer.Serialize(state));
+        await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, JsonSerializer.Serialize(state, LocalStateJsonOptions));
     }
 
     private void NormalizeInputs()
     {
         aircraftLevelPlan.NormalizeSelection();
+        masteryLevelPlan.NormalizeSelection();
 
         foreach (var row in systemPlans)
         {
@@ -452,9 +529,59 @@
             _ => "off"
         };
 
+    private string MasteryLevelButtonClass(int level) =>
+        masteryLevelPlan.StateFor(level) switch
+        {
+            NodeToggleState.Desired => "node-toggle desired",
+            NodeToggleState.Has => "node-toggle has",
+            _ => "node-toggle"
+        };
+
+    private string MasteryLevelStateValue(int level) =>
+        masteryLevelPlan.StateFor(level) switch
+        {
+            NodeToggleState.Desired => "desired",
+            NodeToggleState.Has => "has",
+            _ => "off"
+        };
+
+    private string GoldMasteryButtonClass() =>
+        goldMasteryStatus switch
+        {
+            GoldMasteryStatus.Planned => "node-toggle gold-toggle desired",
+            GoldMasteryStatus.Owned => "node-toggle gold-toggle has",
+            _ => "node-toggle gold-toggle"
+        };
+
+    private string GoldMasteryStateValue() =>
+        goldMasteryStatus switch
+        {
+            GoldMasteryStatus.Planned => "desired",
+            GoldMasteryStatus.Owned => "has",
+            _ => "off"
+        };
+
     private async Task CycleAircraftLevel(int level)
     {
         aircraftLevelPlan.Cycle(level);
+        await RecalculatePlannerAndSave();
+    }
+
+    private async Task CycleMasteryLevel(int level)
+    {
+        masteryLevelPlan.Cycle(level);
+        await RecalculatePlannerAndSave();
+    }
+
+    private async Task CycleGoldMasteryStatus()
+    {
+        goldMasteryStatus = goldMasteryStatus switch
+        {
+            GoldMasteryStatus.Off => GoldMasteryStatus.Owned,
+            GoldMasteryStatus.Owned => GoldMasteryStatus.Planned,
+            _ => GoldMasteryStatus.Off
+        };
+
         await RecalculatePlannerAndSave();
     }
 
@@ -526,6 +653,7 @@
             level = Math.Clamp(level, 1, 20);
             var nextState = StateFor(level) switch
             {
+                NodeToggleState.Off when HasDesiredPrerequisite(level) => NodeToggleState.Desired,
                 NodeToggleState.Off => NodeToggleState.Has,
                 NodeToggleState.Has => NodeToggleState.Desired,
                 _ => NodeToggleState.Off
@@ -538,11 +666,6 @@
             else
             {
                 LevelStates[level] = nextState;
-            }
-
-            if (nextState == NodeToggleState.Desired && !HasOwnedPrerequisitePath(level))
-            {
-                MarkPrerequisitePathAsOwned(level);
             }
 
             NormalizeSelection();
@@ -595,25 +718,143 @@
             }
         }
 
-        private bool HasOwnedPrerequisitePath(int level)
+        private bool HasDesiredPrerequisite(int level)
         {
             for (var prerequisiteLevel = 1; prerequisiteLevel < level; prerequisiteLevel++)
             {
-                if (StateFor(prerequisiteLevel) != NodeToggleState.Has)
+                if (StateFor(prerequisiteLevel) == NodeToggleState.Desired)
                 {
-                    return false;
+                    return true;
                 }
             }
 
-            return true;
+            return false;
+        }
+    }
+
+    private sealed class MasteryLevelPlan
+    {
+        public Dictionary<int, NodeToggleState> LevelStates { get; } = [];
+
+        public int CurrentMasteryLevel
+        {
+            get
+            {
+                var hasLevels = LevelStates
+                    .Where(level => level.Value == NodeToggleState.Has)
+                    .Select(level => level.Key)
+                    .ToArray();
+
+                return hasLevels.Length == 0 ? 1 : hasLevels.Max();
+            }
         }
 
-        private void MarkPrerequisitePathAsOwned(int level)
+        public int PlannedMasteryLevel
+        {
+            get
+            {
+                var targetLevels = LevelStates
+                    .Where(level => level.Value is NodeToggleState.Desired or NodeToggleState.Has)
+                    .Select(level => level.Key)
+                    .ToArray();
+
+                return targetLevels.Length == 0 ? 1 : targetLevels.Max();
+            }
+        }
+
+        public static MasteryLevelPlan FromLevels(int currentLevel, int plannedLevel)
+        {
+            var plan = new MasteryLevelPlan();
+            plan.LoadLevels(currentLevel, plannedLevel);
+            return plan;
+        }
+
+        public bool IsTarget(int level) => StateFor(level) is NodeToggleState.Desired or NodeToggleState.Has;
+
+        public NodeToggleState StateFor(int level) =>
+            LevelStates.TryGetValue(level, out var state) ? state : NodeToggleState.Off;
+
+        public void Cycle(int level)
+        {
+            level = Math.Clamp(level, 1, 24);
+            var nextState = StateFor(level) switch
+            {
+                NodeToggleState.Off when HasDesiredPrerequisite(level) => NodeToggleState.Desired,
+                NodeToggleState.Off => NodeToggleState.Has,
+                NodeToggleState.Has => NodeToggleState.Desired,
+                _ => NodeToggleState.Off
+            };
+
+            if (nextState == NodeToggleState.Off)
+            {
+                LevelStates.Remove(level);
+            }
+            else
+            {
+                LevelStates[level] = nextState;
+            }
+
+            NormalizeSelection();
+        }
+
+        public void LoadLevels(int currentLevel, int plannedLevel)
+        {
+            LevelStates.Clear();
+
+            currentLevel = Math.Clamp(currentLevel, 1, 24);
+            plannedLevel = Math.Clamp(plannedLevel, currentLevel, 24);
+
+            for (var level = 1; level <= currentLevel; level++)
+            {
+                LevelStates[level] = NodeToggleState.Has;
+            }
+
+            for (var level = currentLevel + 1; level <= plannedLevel; level++)
+            {
+                LevelStates[level] = NodeToggleState.Desired;
+            }
+        }
+
+        public void NormalizeSelection()
+        {
+            var plannedLevel = PlannedMasteryLevel;
+            var currentLevel = CurrentMasteryLevel;
+
+            if (plannedLevel < currentLevel)
+            {
+                plannedLevel = currentLevel;
+            }
+
+            for (var level = 1; level <= currentLevel; level++)
+            {
+                LevelStates[level] = NodeToggleState.Has;
+            }
+
+            for (var level = currentLevel + 1; level <= plannedLevel; level++)
+            {
+                if (StateFor(level) == NodeToggleState.Off)
+                {
+                    LevelStates[level] = NodeToggleState.Desired;
+                }
+            }
+
+            foreach (var level in LevelStates.Keys.Where(level => level > plannedLevel).ToArray())
+            {
+                LevelStates.Remove(level);
+            }
+        }
+
+        private bool HasDesiredPrerequisite(int level)
         {
             for (var prerequisiteLevel = 1; prerequisiteLevel < level; prerequisiteLevel++)
             {
-                LevelStates[prerequisiteLevel] = NodeToggleState.Has;
+                if (StateFor(prerequisiteLevel) == NodeToggleState.Desired)
+                {
+                    return true;
+                }
             }
+
+            return false;
         }
     }
 
@@ -836,5 +1077,8 @@
         int SchemaVersion,
         int CurrentAircraftLevel,
         int TargetAircraftLevel,
-        IReadOnlyList<SystemPlanState>? SystemPlans);
+        IReadOnlyList<SystemPlanState>? SystemPlans,
+        int CurrentMasteryLevel,
+        int PlannedMasteryLevel,
+        string? GoldMasteryStatus);
 }

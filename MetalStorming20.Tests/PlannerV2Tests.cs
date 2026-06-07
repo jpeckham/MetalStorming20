@@ -61,6 +61,49 @@ public class PlannerV2CostTests
     }
 }
 
+public class PlannerV2MasteryTests
+{
+    [Fact]
+    public void Plan_NonGoldMasteryRebate_ReducesNetGrindNeeded()
+    {
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 1)],
+            OwnedSystemNodes: [],
+            EquippedSystemBranches: [],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 20)],
+            SystemTargets: [],
+            SystemSlots: PlannerV2.GenericSystemSlots,
+            MasteryPlan: new MasteryPlanV2(1, 23, GoldMasteryStatus.Off)));
+
+        Assert.Empty(result.Warnings);
+        Assert.Equal(1900, result.MasteryRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
+        Assert.Equal(4400, result.MasteryRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
+        Assert.Equal(9300, result.NetGrindNeeded.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
+        Assert.Equal(45600, result.NetGrindNeeded.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
+    }
+
+    [Fact]
+    public void Plan_GoldMasteryRebate_IncludesGoldBonusOnTopOfNonGoldRewards()
+    {
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 1)],
+            OwnedSystemNodes: [],
+            EquippedSystemBranches: [],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 20)],
+            SystemTargets: [],
+            SystemSlots: PlannerV2.GenericSystemSlots,
+            MasteryPlan: new MasteryPlanV2(1, 23, GoldMasteryStatus.Planned)));
+
+        Assert.Empty(result.Warnings);
+        Assert.Equal(4900, result.MasteryRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
+        Assert.Equal(16900, result.MasteryRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
+        Assert.Equal(6300, result.NetGrindNeeded.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
+        Assert.Equal(33100, result.NetGrindNeeded.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
+    }
+}
+
 public class PlannerV2DependencyTests
 {
     [Fact]

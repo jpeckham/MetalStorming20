@@ -28,6 +28,24 @@ public class PlannerPageTests : PageTest
         await button.ClickAsync();
     }
 
+    private async Task MarkMasteryLevelAsDesired(int level)
+    {
+        var masteryLevel = Page
+            .GetByRole(AriaRole.Group, new() { Name = "Mastery level nodes", Exact = true })
+            .GetByRole(AriaRole.Button, new() { Name = level.ToString(), Exact = true });
+
+        await masteryLevel.ClickAsync();
+        await masteryLevel.ClickAsync();
+    }
+
+    private async Task MarkGoldMasteryAsPlanned()
+    {
+        var goldButton = Page.GetByRole(AriaRole.Button, new() { Name = "Gold", Exact = true });
+
+        await goldButton.ClickAsync();
+        await goldButton.ClickAsync();
+    }
+
     [TestMethod]
     public async Task HomePageLoadsNewPlannerWithoutNavigation()
     {
@@ -177,6 +195,170 @@ public class PlannerPageTests : PageTest
         await Expect(levelEight).ToHaveAttributeAsync("data-state", "desired");
 
         await Expect(Page.GetByText("Aircraft 7->8")).ToBeVisibleAsync();
+    }
+
+    [TestMethod]
+    public async Task Upgrades2AircraftSelectingNextLevelDoesNotConvertDesiredPrerequisiteToOwned()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        var aircraftLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Aircraft level nodes" });
+        var levelSix = aircraftLevels.GetByRole(AriaRole.Button, new() { Name = "6", Exact = true });
+        var levelSeven = aircraftLevels.GetByRole(AriaRole.Button, new() { Name = "7", Exact = true });
+
+        await levelSix.ClickAsync();
+        await levelSix.ClickAsync();
+        await levelSeven.ClickAsync();
+
+        await Expect(levelSix).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(levelSeven).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(Page.GetByText("Aircraft 5->6")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Aircraft 6->7")).ToBeVisibleAsync();
+    }
+
+    [TestMethod]
+    public async Task Upgrades2MasteryControlsRenderOneLevelTrackAndOneGoldToggle()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Mastery", Exact = true })).ToBeVisibleAsync();
+        var masteryLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Mastery level nodes", Exact = true });
+        var goldButton = Page.GetByRole(AriaRole.Button, new() { Name = "Gold", Exact = true });
+
+        await Expect(masteryLevels.GetByRole(AriaRole.Button, new() { Name = "1", Exact = true })).ToHaveAttributeAsync("data-state", "has");
+        await Expect(masteryLevels.GetByRole(AriaRole.Button, new() { Name = "24", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Group, new() { Name = "Gold mastery level nodes", Exact = true })).ToHaveCountAsync(0);
+        await Expect(goldButton).ToHaveAttributeAsync("data-state", "off");
+        await goldButton.ClickAsync();
+        await Expect(goldButton).ToHaveAttributeAsync("data-state", "has");
+        await goldButton.ClickAsync();
+        await Expect(goldButton).ToHaveAttributeAsync("data-state", "desired");
+    }
+
+    [TestMethod]
+    public async Task Upgrades2MasteryRebateReducesNetGrindNeeded()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        var aircraftLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Aircraft level nodes" });
+        var aircraftLevelSix = aircraftLevels.GetByRole(AriaRole.Button, new() { Name = "6", Exact = true });
+        await aircraftLevelSix.ClickAsync();
+        await aircraftLevelSix.ClickAsync();
+        await MarkMasteryLevelAsDesired(6);
+        await MarkGoldMasteryAsPlanned();
+
+        await Expect(Page.GetByText("Mastery Rebate")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("AIRCRAFT_PARTS 1,000", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Net Grind Needed")).ToBeVisibleAsync();
+        var netGrindNeeded = Page.GetByTestId("net-grind-needed");
+        await Expect(netGrindNeeded.GetByText("SILVER 1,000", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(netGrindNeeded.GetByText("AIRCRAFT_PARTS 225", new() { Exact = true })).ToHaveCountAsync(0);
+    }
+
+    [TestMethod]
+    public async Task Upgrades2MasterySelectingNextLevelDoesNotConvertDesiredPrerequisiteToOwned()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        var masteryLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Mastery level nodes", Exact = true });
+        var levelSix = masteryLevels.GetByRole(AriaRole.Button, new() { Name = "6", Exact = true });
+        var levelSeven = masteryLevels.GetByRole(AriaRole.Button, new() { Name = "7", Exact = true });
+
+        await levelSix.ClickAsync();
+        await levelSix.ClickAsync();
+        await levelSeven.ClickAsync();
+
+        await Expect(levelSix).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(levelSeven).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(Page.GetByText("Mastery Rebate")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("SILVER 900", new() { Exact = true })).ToBeVisibleAsync();
+    }
+
+    [TestMethod]
+    public async Task Upgrades2PersistsAircraftLevelsAndSystemNodesAfterReload()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        var aircraftLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Aircraft level nodes" });
+        var aircraftLevelEight = aircraftLevels.GetByRole(AriaRole.Button, new() { Name = "8", Exact = true });
+        var engines = Page.GetByTestId("system-engines");
+        var engineLevelOne = engines.GetByRole(AriaRole.Button, new() { Name = "1", Exact = true });
+        var engineLevelTwo = engines.GetByRole(AriaRole.Button, new() { Name = "2", Exact = true });
+
+        await aircraftLevelEight.ClickAsync();
+        await aircraftLevelEight.ClickAsync();
+        await engineLevelOne.ClickAsync();
+        await engineLevelTwo.ClickAsync();
+        await engineLevelTwo.ClickAsync();
+
+        await Expect(aircraftLevelEight).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(engineLevelOne).ToHaveAttributeAsync("data-state", "has");
+        await Expect(engineLevelTwo).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(Page).ToHaveTitleAsync("Upgrades 2.0 Planner");
+        await Page.WaitForFunctionAsync(
+            """
+            () => {
+                const state = JSON.parse(localStorage.getItem('metalstorming20.upgrades2.state') || '{}');
+                const engines = state.systemPlans?.find(plan => plan.systemSlotId === 'generic_engines');
+                return state.currentAircraftLevel === 7 &&
+                    state.targetAircraftLevel === 8 &&
+                    engines?.nodeStates?.['1'] === 'has' &&
+                    engines?.nodeStates?.['2'] === 'desired';
+            }
+            """);
+
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        aircraftLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Aircraft level nodes" });
+        aircraftLevelEight = aircraftLevels.GetByRole(AriaRole.Button, new() { Name = "8", Exact = true });
+        engines = Page.GetByTestId("system-engines");
+        engineLevelOne = engines.GetByRole(AriaRole.Button, new() { Name = "1", Exact = true });
+        engineLevelTwo = engines.GetByRole(AriaRole.Button, new() { Name = "2", Exact = true });
+
+        await Expect(aircraftLevelEight).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(engineLevelOne).ToHaveAttributeAsync("data-state", "has");
+        await Expect(engineLevelTwo).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(Page.GetByText("Engines 1->2")).ToBeVisibleAsync();
+    }
+
+    [TestMethod]
+    public async Task Upgrades2RestoresSystemNodesFromLocalStorage()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync(
+            """
+            localStorage.setItem('metalstorming20.upgrades2.state', JSON.stringify({
+                schemaVersion: 2,
+                currentAircraftLevel: 7,
+                targetAircraftLevel: 8,
+                systemPlans: [
+                    {
+                        systemSlotId: 'generic_engines',
+                        selectedNodes: ['1', '2'],
+                        nodeStates: { '1': 'has', '2': 'desired' }
+                    }
+                ]
+            }))
+            """);
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        var aircraftLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Aircraft level nodes" });
+        var engines = Page.GetByTestId("system-engines");
+
+        await Expect(aircraftLevels.GetByRole(AriaRole.Button, new() { Name = "8", Exact = true })).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "1", Exact = true })).ToHaveAttributeAsync("data-state", "has");
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "2", Exact = true })).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(Page.GetByText("Engines 1->2")).ToBeVisibleAsync();
     }
 
     [TestMethod]
