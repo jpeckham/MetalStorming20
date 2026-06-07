@@ -8,7 +8,7 @@
 <PageTitle>Upgrades 2.0 Planner</PageTitle>
 
 <h1>Upgrades 2.0 Planner</h1>
-<p class="lead">Plan aircraft levels, every system track, branch ownership, balances, deficits, and shareable exports.</p>
+<p class="lead">Plan aircraft levels, every system track, branch ownership, required resources, and shareable exports.</p>
 <div class="alert alert-info py-2" role="note">
     Green owned nodes are your current state. Blue desired nodes are your target state. Costs are calculated for the gap between owned and desired. If you jump to a branch node such as 7A without an owned path before it, the planner marks the required prior path green automatically.
 </div>
@@ -108,50 +108,7 @@
     }
 </style>
 
-<section class="border rounded p-3 mt-3">
-    <h2 class="h5">Resource Balances</h2>
-    <div class="row g-2">
-        <div class="col-md-3 col-6">
-            <label for="silver-balance" class="form-label">Silver balance</label>
-            <input id="silver-balance" type="number" min="0" class="form-control" @bind="silverBalance" />
-        </div>
-        <div class="col-md-3 col-6">
-            <label for="aircraft-parts-balance" class="form-label">Aircraft parts balance</label>
-            <input id="aircraft-parts-balance" type="number" min="0" class="form-control" @bind="aircraftPartsBalance" />
-        </div>
-        <div class="col-md-3 col-6">
-            <label for="fuselage-parts-balance" class="form-label">Fuselage parts balance</label>
-            <input id="fuselage-parts-balance" type="number" min="0" class="form-control" @bind="fuselagePartsBalance" />
-        </div>
-        <div class="col-md-3 col-6">
-            <label for="engine-parts-balance" class="form-label">Engine parts balance</label>
-            <input id="engine-parts-balance" type="number" min="0" class="form-control" @bind="enginePartsBalance" />
-        </div>
-        <div class="col-md-3 col-6">
-            <label for="avionics-parts-balance" class="form-label">Avionics parts balance</label>
-            <input id="avionics-parts-balance" type="number" min="0" class="form-control" @bind="avionicsPartsBalance" />
-        </div>
-        <div class="col-md-3 col-6">
-            <label for="cannon-parts-balance" class="form-label">Cannon parts balance</label>
-            <input id="cannon-parts-balance" type="number" min="0" class="form-control" @bind="cannonPartsBalance" />
-        </div>
-        <div class="col-md-3 col-6">
-            <label for="missile-parts-balance" class="form-label">Missile parts balance</label>
-            <input id="missile-parts-balance" type="number" min="0" class="form-control" @bind="missilePartsBalance" />
-        </div>
-        <div class="col-md-3 col-6">
-            <label for="rocket-parts-balance" class="form-label">Rocket parts balance</label>
-            <input id="rocket-parts-balance" type="number" min="0" class="form-control" @bind="rocketPartsBalance" />
-        </div>
-        <div class="col-md-3 col-6">
-            <label for="advanced-parts-balance" class="form-label">Advanced parts balance</label>
-            <input id="advanced-parts-balance" type="number" min="0" class="form-control" @bind="advancedPartsBalance" />
-        </div>
-    </div>
-</section>
-
 <div class="d-flex flex-wrap gap-2 align-items-center my-4">
-    <button class="btn btn-primary btn-lg" @onclick="RunPlanner">Run Planner</button>
     <button class="btn btn-outline-secondary" @onclick="ExportJson" disabled="@(result is null)">Export JSON</button>
     <button class="btn btn-outline-secondary" @onclick="ExportMarkdown" disabled="@(result is null)">Export Markdown</button>
     <button class="btn btn-outline-secondary" @onclick="CopyShareSummary" disabled="@(result is null)">Copy Share Summary</button>
@@ -185,19 +142,6 @@
                     }
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="border rounded p-3 h-100">
-                    <h3 class="h5">Deficits</h3>
-                    @if (result.Deficits.Count == 0)
-                    {
-                        <div>No deficits</div>
-                    }
-                    @foreach (var deficit in result.Deficits)
-                    {
-                        <div>@deficit.CurrencyCode deficit @deficit.Amount.ToString("N0")</div>
-                    }
-                </div>
-            </div>
         </div>
 
         <div class="row g-3 mt-1">
@@ -210,12 +154,6 @@
                         <option value="@currency">@currency</option>
                     }
                 </select>
-            </div>
-            <div class="col-md-4 d-flex align-items-end">
-                <div class="form-check">
-                    <input id="affordable-filter" class="form-check-input" type="checkbox" @bind="affordableOnly" />
-                    <label class="form-check-label" for="affordable-filter">Affordable steps only</label>
-                </div>
             </div>
         </div>
 
@@ -262,20 +200,10 @@
 
     private int currentAircraftLevel => aircraftLevelPlan.CurrentAircraftLevel;
     private int targetAircraftLevel => aircraftLevelPlan.TargetAircraftLevel;
-    private int silverBalance;
-    private int aircraftPartsBalance;
-    private int fuselagePartsBalance;
-    private int enginePartsBalance;
-    private int avionicsPartsBalance;
-    private int cannonPartsBalance;
-    private int missilePartsBalance;
-    private int rocketPartsBalance;
-    private int advancedPartsBalance;
 
     private PlannerResultV2? result;
     private string? exportText;
     private string currencyFilter = "";
-    private bool affordableOnly;
 
     private static readonly string[] CurrencyCodes =
     [
@@ -294,7 +222,6 @@
 
     private IEnumerable<PlanStepV2> FilteredSteps => result?.Steps
         .Where(s => string.IsNullOrEmpty(currencyFilter) || s.Costs.Any(c => c.CurrencyCode == currencyFilter))
-        .Where(s => !affordableOnly || IsAffordable(s))
         ?? [];
 
     protected override async Task OnInitializedAsync()
@@ -313,6 +240,7 @@
         }
 
         ResetSystemRows();
+        RecalculatePlanner();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -335,16 +263,6 @@
         }
 
         aircraftLevelPlan.LoadLevels(state.CurrentAircraftLevel, state.TargetAircraftLevel);
-        silverBalance = state.SilverBalance;
-        aircraftPartsBalance = state.AircraftPartsBalance;
-        fuselagePartsBalance = state.FuselagePartsBalance;
-        enginePartsBalance = state.EnginePartsBalance;
-        avionicsPartsBalance = state.AvionicsPartsBalance;
-        cannonPartsBalance = state.CannonPartsBalance;
-        missilePartsBalance = state.MissilePartsBalance;
-        rocketPartsBalance = state.RocketPartsBalance;
-        advancedPartsBalance = state.AdvancedPartsBalance;
-
         foreach (var savedSystem in state.SystemPlans ?? [])
         {
             var row = systemPlans.FirstOrDefault(p => p.SystemSlotId == savedSystem.SystemSlotId);
@@ -357,6 +275,7 @@
             row.NormalizeSelection();
         }
 
+        RecalculatePlanner();
         StateHasChanged();
     }
 
@@ -366,11 +285,16 @@
         systemPlans.AddRange(systemSlots.Select(SystemPlanRow.FromSlot));
     }
 
-    private async Task RunPlanner()
+    private void RecalculatePlanner()
     {
         NormalizeInputs();
         result = PlannerV2.Plan(BuildRequest());
         exportText = null;
+    }
+
+    private async Task RecalculatePlannerAndSave()
+    {
+        RecalculatePlanner();
         await SaveState();
     }
 
@@ -426,11 +350,6 @@
         lines.Add("## Totals Required");
         lines.AddRange(result.TotalsRequired.Select(t => $"- {t.CurrencyCode}: {t.Amount:N0}"));
         lines.Add("");
-        lines.Add("## Deficits");
-        lines.AddRange(result.Deficits.Count == 0
-            ? ["- None"]
-            : result.Deficits.Select(d => $"- {d.CurrencyCode}: {d.Amount:N0}"));
-        lines.Add("");
         lines.Add("## Purchase Steps");
         lines.AddRange(result.Steps.Select(s => $"- {s.Order}. {DisplayStepGroup(s.SystemSlotId ?? "aircraft")} {s.FromLevel}->{s.ToLevel}: {string.Join(", ", s.Costs.Select(c => $"{c.CurrencyCode} {c.Amount:N0}"))}"));
 
@@ -443,7 +362,7 @@
             Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, currentAircraftLevel)],
             OwnedSystemNodes: systemPlans.SelectMany(BuildOwnedNodes).ToArray(),
             EquippedSystemBranches: systemPlans.SelectMany(BuildEquippedBranches).ToArray(),
-            ResourceBalances: BuildBalances(),
+            ResourceBalances: [],
             AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, targetAircraftLevel)],
             SystemTargets: systemPlans.Select(p => new SystemTargetV2(
                 p.SystemSlotId,
@@ -471,43 +390,15 @@
             .Select(group => group.OrderBy(node => node.Branch, StringComparer.OrdinalIgnoreCase).First())
             .Select(node => new EquippedSystemBranchV2(row.SystemSlotId, node.Level, node.Branch!));
 
-    private IReadOnlyList<ResourceBalanceV2> BuildBalances() =>
-    [
-        new(PlannerV2.Currencies.Silver, silverBalance),
-        new(PlannerV2.Currencies.AircraftParts, aircraftPartsBalance),
-        new(PlannerV2.Currencies.FuselageParts, fuselagePartsBalance),
-        new(PlannerV2.Currencies.EngineParts, enginePartsBalance),
-        new(PlannerV2.Currencies.AvionicsParts, avionicsPartsBalance),
-        new(PlannerV2.Currencies.CannonParts, cannonPartsBalance),
-        new(PlannerV2.Currencies.MissileParts, missilePartsBalance),
-        new(PlannerV2.Currencies.RocketParts, rocketPartsBalance),
-        new(PlannerV2.Currencies.AdvancedParts, advancedPartsBalance)
-    ];
-
     private async Task SaveState()
     {
         var state = new Upgrades2LocalState(
             2,
             currentAircraftLevel,
             targetAircraftLevel,
-            systemPlans.Select(SystemPlanState.FromRow).ToArray(),
-            silverBalance,
-            aircraftPartsBalance,
-            fuselagePartsBalance,
-            enginePartsBalance,
-            avionicsPartsBalance,
-            cannonPartsBalance,
-            missilePartsBalance,
-            rocketPartsBalance,
-            advancedPartsBalance);
+            systemPlans.Select(SystemPlanState.FromRow).ToArray());
 
         await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, JsonSerializer.Serialize(state));
-    }
-
-    private bool IsAffordable(PlanStepV2 step)
-    {
-        var balances = BuildBalances().ToDictionary(b => b.CurrencyCode, b => b.Amount);
-        return step.Costs.All(c => balances.TryGetValue(c.CurrencyCode, out var balance) && balance >= c.Amount);
     }
 
     private void NormalizeInputs()
@@ -518,16 +409,6 @@
         {
             row.NormalizeSelection();
         }
-
-        silverBalance = Math.Max(0, silverBalance);
-        aircraftPartsBalance = Math.Max(0, aircraftPartsBalance);
-        fuselagePartsBalance = Math.Max(0, fuselagePartsBalance);
-        enginePartsBalance = Math.Max(0, enginePartsBalance);
-        avionicsPartsBalance = Math.Max(0, avionicsPartsBalance);
-        cannonPartsBalance = Math.Max(0, cannonPartsBalance);
-        missilePartsBalance = Math.Max(0, missilePartsBalance);
-        rocketPartsBalance = Math.Max(0, rocketPartsBalance);
-        advancedPartsBalance = Math.Max(0, advancedPartsBalance);
     }
 
     private string DisplayStepGroup(string id) => id == "aircraft"
@@ -571,14 +452,16 @@
             _ => "off"
         };
 
-    private void CycleAircraftLevel(int level)
+    private async Task CycleAircraftLevel(int level)
     {
         aircraftLevelPlan.Cycle(level);
+        await RecalculatePlannerAndSave();
     }
 
-    private static void CycleNode(SystemPlanRow row, int level, string? branchCode)
+    private async Task CycleNode(SystemPlanRow row, int level, string? branchCode)
     {
         row.Cycle(level, branchCode);
+        await RecalculatePlannerAndSave();
     }
 
     private static string NodeLabel(int level, string branchCode) => $"{level}{branchCode}";
@@ -643,8 +526,8 @@
             level = Math.Clamp(level, 1, 20);
             var nextState = StateFor(level) switch
             {
-                NodeToggleState.Off => NodeToggleState.Desired,
-                NodeToggleState.Desired => NodeToggleState.Has,
+                NodeToggleState.Off => NodeToggleState.Has,
+                NodeToggleState.Has => NodeToggleState.Desired,
                 _ => NodeToggleState.Off
             };
 
@@ -782,8 +665,8 @@
             var key = NodeKey(level, branchCode);
             var nextState = StateFor(key) switch
             {
-                NodeToggleState.Off => NodeToggleState.Desired,
-                NodeToggleState.Desired => NodeToggleState.Has,
+                NodeToggleState.Off => NodeToggleState.Has,
+                NodeToggleState.Has => NodeToggleState.Desired,
                 _ => NodeToggleState.Off
             };
 
@@ -796,7 +679,9 @@
                 NodeStates[key] = nextState;
             }
 
-            if (nextState == NodeToggleState.Desired && level >= 5 && !HasOwnedPrerequisitePath(level, branchCode))
+            if (level >= 5 &&
+                nextState is NodeToggleState.Has or NodeToggleState.Desired &&
+                !HasSelectedPrerequisitePath(level))
             {
                 MarkPrerequisitePathAsOwned(level, branchCode);
             }
@@ -865,7 +750,7 @@
             }
         }
 
-        private bool HasOwnedPrerequisitePath(int level, string? branchCode)
+        private bool HasSelectedPrerequisitePath(int level)
         {
             if (level <= 1)
             {
@@ -874,7 +759,7 @@
 
             for (var trunkLevel = 1; trunkLevel <= Math.Min(level - 1, 4); trunkLevel++)
             {
-                if (StateFor(trunkLevel, null) != NodeToggleState.Has)
+                if (!IsTarget(trunkLevel, null))
                 {
                     return false;
                 }
@@ -885,11 +770,9 @@
                 return true;
             }
 
-            var branch = branchCode ?? "A";
             for (var branchLevel = 5; branchLevel < level; branchLevel++)
             {
-                if (StateFor(branchLevel, "A") != NodeToggleState.Has &&
-                    StateFor(branchLevel, "B") != NodeToggleState.Has)
+                if (!IsTarget(branchLevel, "A") && !IsTarget(branchLevel, "B"))
                 {
                     return false;
                 }
@@ -953,14 +836,5 @@
         int SchemaVersion,
         int CurrentAircraftLevel,
         int TargetAircraftLevel,
-        IReadOnlyList<SystemPlanState>? SystemPlans,
-        int SilverBalance,
-        int AircraftPartsBalance,
-        int FuselagePartsBalance,
-        int EnginePartsBalance,
-        int AvionicsPartsBalance,
-        int CannonPartsBalance,
-        int MissilePartsBalance,
-        int RocketPartsBalance,
-        int AdvancedPartsBalance);
+        IReadOnlyList<SystemPlanState>? SystemPlans);
 }

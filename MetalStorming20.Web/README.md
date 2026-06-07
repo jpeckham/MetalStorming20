@@ -11,9 +11,9 @@ Web App (Blazor WebAssembly)
 ----------------------------
 - Start the dev server:
   ```bash
-  dotnet run --project MetalStorming20.Web/MetalStorming20.Web.csproj --urls http://localhost:5173
+  dotnet run --project MetalStorming20.Web/MetalStorming20.Web.csproj --urls http://localhost:5193
   ```
-- Open `http://localhost:5173` in your browser.
+- Open `http://localhost:5193` in your browser.
 
 Usage
 -----
@@ -22,9 +22,9 @@ Planner at `/`:
 - Click square node toggles for every generic upgrade type.
 - Use the built-in rows for Fuselage, Engines, Avionics, Cannons, Main/Radar Missile, Secondary/IR Missile, and Rockets.
 - Levels `1-4` are single buttons; branch levels are stacked as `5A/5B`, `6A/6B`, `7A/7B`, and `8A/8B`.
-- Each node cycles through off, desired, and has. Has is your current state; desired is the target state. Costs are calculated for the gap between current and target.
-- Enter global balances for silver, aircraft parts, system parts, and advanced parts.
-- Run the planner to see totals, deficits, purchase steps, warnings, filters, JSON export, markdown export, and a copyable share summary.
+- Each node cycles through off, has, and desired. Has is your current state; desired is the target state. Costs are calculated for the gap between current and target.
+- The planner recalculates automatically as you change aircraft and system nodes.
+- Review totals, purchase steps, warnings, filters, JSON export, markdown export, and a copyable share summary.
 
 Static Catalogs
 ---------------
