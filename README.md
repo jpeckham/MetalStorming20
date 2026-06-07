@@ -7,13 +7,36 @@
 [![Coverage](.github/badges/coverage.svg)](https://jpeckham.github.io/MetalStorming20/coverage/)
 <!-- badges:end -->
 
-MetalStorm Planner is a Blazor WebAssembly app that helps MetalStorm players forecast the parts and silver needed to finish upgrading a plane, and the mastery rewards that offset those costs. The UI is static and GitHub Pages–friendly, so it can be published directly from the generated `wwwroot` artifacts without a backend server.
+MetalStorm Planner is a Blazor WebAssembly app that helps MetalStorm players forecast Upgrades 2.0 costs. The app loads directly into the new planner for aircraft levels, system tracks, branch ownership, shared balances, deficits, purchase steps, and exports. The UI is static and GitHub Pages-friendly, so it can be published directly from the generated `wwwroot` artifacts without a backend server.
 
 ## Projects
-- **MetalStorming20.Core** – Shared library with the planner math (upgrade steps, mastery reward logic, clamping helpers).
-- **MetalStorming20.Web** – Blazor WebAssembly frontend that hosts the planner UI and static assets.
-- **MetalStorming20.Tests** – Existing xUnit suite that exercises the planner calculations.
-- **MetalStorming20.PlaywrightTests** – New MSTest + Playwright project for UI smoke tests against the published site.
+- **MetalStorming20.Core** – Shared library with the `PlannerV2` Upgrades 2.0 engine.
+- **MetalStorming20.Web** – Blazor WebAssembly frontend that hosts the planner and static catalog assets.
+- **MetalStorming20.Tests** – xUnit suite that exercises Upgrades 2.0 costs, dependency logic, and static catalog files.
+- **MetalStorming20.PlaywrightTests** – MSTest + Playwright project for UI smoke tests against the published site or a local dev server.
+
+## Route
+- `/` - Upgrades 2.0 planner for a generic aircraft, all upgrade types, square node toggles for levels `1-4` and branch nodes `5A-8B`, shared balances, deficits, purchase steps, JSON export, markdown export, and copyable share summaries.
+
+## Upgrades 2.0 static catalogs
+The Upgrades 2.0 planner keeps seed data in immutable static JSON files under `MetalStorming20.Web/wwwroot/data/v2/`:
+
+- `/data/v2/schema-version.json`
+- `/data/v2/currencies.json`
+- `/data/v2/aircraft.json`
+- `/data/v2/aircraft-milestones.json`
+- `/data/v2/system-types.json`
+- `/data/v2/aircraft-system-slots.json`
+- `/data/v2/branch-families.json`
+- `/data/v2/system-node-definitions.json`
+- `/data/v2/upgrade-costs.json`
+
+The seed catalog includes the prompt-provided aircraft and system upgrade cost rows, official aircraft milestone shape, supported currencies, and one generic system-slot catalog. It deliberately shows every supported upgrade type without requiring an aircraft pick: Fuselage, Engines, Avionics, Cannons, Main/Radar Missile, Secondary/IR Missile, and Rockets. Each system uses node toggles laid out as `[1] [2] [3] [4] [5A] [6A] [7A] [8A]` with `[5B] [6B] [7B] [8B]` stacked below the branch columns.
+
+Each node cycles through off, desired, and has. Desired nodes define the target state, has nodes define the current state and also count as target nodes, and the planner calculates the remaining cost from current state to desired state. Exact branch names and node bonus text remain intentionally incremental seed-data work.
+
+## Browser state and exports
+The planner persists its generic form state to `localStorage` using schema version `2`. Planner results can be exported as JSON for machine-readable sharing, markdown for human-readable work orders, or a copyable share summary. No server API, database, auth, or backend dependency is required.
 
 ## Running the app locally
 1. Install the .NET 8 SDK.
@@ -22,13 +45,18 @@ MetalStorm Planner is a Blazor WebAssembly app that helps MetalStorm players for
    ```bash
    dotnet run --project MetalStorming20.Web/MetalStorming20.Web.csproj
    ```
-4. Visit the app at the printed local URL (by default `http://localhost:5000/`).
+4. Visit the app at the printed local URL.
 
 ## Testing
 ### Unit tests (planner math)
 Run the xUnit suite from the repository root:
 ```bash
 dotnet test MetalStorming20.Tests/MetalStorming20.Tests.csproj
+```
+
+Focused Upgrades 2.0 tests:
+```bash
+dotnet test MetalStorming20.Tests/MetalStorming20.Tests.csproj --filter "PlannerV2CostTests|PlannerV2DependencyTests|Upgrades2CatalogFiles"
 ```
 
 ### UI smoke tests (Playwright)
@@ -47,7 +75,7 @@ The Playwright tests can point at either a local development server or the GitHu
    PLAYWRIGHT_BASE_URL="https://<user>.github.io/<repo>/" dotnet test MetalStorming20.PlaywrightTests/MetalStorming20.PlaywrightTests.csproj -c Release
    ```
 
-The GitHub Pages workflow publishes the site and then runs these Playwright tests against the deployed URL to ensure navigation and calculations work after each deployment.
+The GitHub Pages workflow publishes the site and then runs these Playwright tests against the deployed URL to ensure routing and calculations work after each deployment.
 
 ## Deployment
 GitHub Pages and release automation are configured via `.github/workflows/continuous-delivery-dotnet-blazor-github-pages.yml` to:

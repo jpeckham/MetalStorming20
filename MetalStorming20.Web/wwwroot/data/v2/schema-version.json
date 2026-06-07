@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 2,
+  "catalogVersion": "2026-06-06",
+  "minimumSupportedStateVersion": 2,
+  "notes": "Upgrades 2.0 seed catalog for static client-side planning."
+}

@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug MetalStorming20.Web",
+      "type": "blazorwasm",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/MetalStorming20.Web",
+      "url": "http://localhost:5193",
+      "browser": "edge",
+      "preLaunchTask": "build MetalStorming20.Web",
+      "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}"
+    }
+  ]
+}

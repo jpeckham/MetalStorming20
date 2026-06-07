@@ -1,0 +1,966 @@
+@page "/"
+@using System.Text.Json
+@using MetalStorming20.Core
+@using MetalStorming20.Web.Services
+@inject IJSRuntime JS
+@inject Upgrades2CatalogService CatalogService
+
+<PageTitle>Upgrades 2.0 Planner</PageTitle>
+
+<h1>Upgrades 2.0 Planner</h1>
+<p class="lead">Plan aircraft levels, every system track, branch ownership, balances, deficits, and shareable exports.</p>
+<div class="alert alert-info py-2" role="note">
+    Green owned nodes are your current state. Blue desired nodes are your target state. Costs are calculated for the gap between owned and desired. If you jump to a branch node such as 7A without an owned path before it, the planner marks the required prior path green automatically.
+</div>
+
+<div class="alert alert-secondary py-2" role="status">
+    Browser state schema version 2. Static catalog version 2026-06-06.
+</div>
+
+<section class="border rounded p-3">
+    <h2 class="h5">Aircraft Level</h2>
+    <div class="level-grid" role="group" aria-label="Aircraft level nodes">
+        @foreach (var level in AircraftLevels)
+        {
+            <button type="button" class="@AircraftLevelButtonClass(level)" data-state="@AircraftLevelStateValue(level)" aria-pressed="@aircraftLevelPlan.IsTarget(level).ToString().ToLowerInvariant()" @onclick="() => CycleAircraftLevel(level)">@level</button>
+        }
+    </div>
+</section>
+
+<section class="border rounded p-3 mt-3">
+    <h2 class="h5">System Tracks</h2>
+    <div class="table-responsive system-track-table">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Upgrade type</th>
+                    <th>Target nodes</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in systemPlans)
+                {
+                    <tr data-testid="@($"system-{Slug(row.DisplayName)}")">
+                        <th scope="row">@row.DisplayName</th>
+                        <td>
+                            <div class="node-grid" role="group" aria-label="@($"{row.DisplayName} target nodes")">
+                                <button type="button" class="@NodeButtonClass(row, 1, null)" data-state="@NodeStateValue(row, 1, null)" aria-pressed="@row.IsTarget(1, null).ToString().ToLowerInvariant()" @onclick="() => CycleNode(row, 1, null)">1</button>
+                                <button type="button" class="@NodeButtonClass(row, 2, null)" data-state="@NodeStateValue(row, 2, null)" aria-pressed="@row.IsTarget(2, null).ToString().ToLowerInvariant()" @onclick="() => CycleNode(row, 2, null)">2</button>
+                                <button type="button" class="@NodeButtonClass(row, 3, null)" data-state="@NodeStateValue(row, 3, null)" aria-pressed="@row.IsTarget(3, null).ToString().ToLowerInvariant()" @onclick="() => CycleNode(row, 3, null)">3</button>
+                                <button type="button" class="@NodeButtonClass(row, 4, null)" data-state="@NodeStateValue(row, 4, null)" aria-pressed="@row.IsTarget(4, null).ToString().ToLowerInvariant()" @onclick="() => CycleNode(row, 4, null)">4</button>
+                                @foreach (var level in BranchLevels)
+                                {
+                                    <div class="branch-stack">
+                                        <button type="button" class='@NodeButtonClass(row, level, "A")' data-state='@NodeStateValue(row, level, "A")' aria-pressed='@row.IsTarget(level, "A").ToString().ToLowerInvariant()' @onclick='() => CycleNode(row, level, "A")'>@NodeLabel(level, "A")</button>
+                                        <button type="button" class='@NodeButtonClass(row, level, "B")' data-state='@NodeStateValue(row, level, "B")' aria-pressed='@row.IsTarget(level, "B").ToString().ToLowerInvariant()' @onclick='() => CycleNode(row, level, "B")'>@NodeLabel(level, "B")</button>
+                                    </div>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<style>
+    .node-grid {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        min-width: 30rem;
+    }
+
+    .level-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, 2.65rem);
+        gap: 0.35rem;
+    }
+
+    .node-toggle {
+        width: 2.65rem;
+        height: 2.65rem;
+        border: 1px solid #6c757d;
+        border-radius: 0.25rem;
+        background: #fff;
+        color: #212529;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .node-toggle.desired {
+        background: #0d6efd;
+        border-color: #0d6efd;
+        color: #fff;
+    }
+
+    .node-toggle.has {
+        background: #198754;
+        border-color: #198754;
+        color: #fff;
+    }
+
+    .branch-stack {
+        display: grid;
+        grid-template-rows: 2.65rem 2.65rem;
+        gap: 0.25rem;
+    }
+</style>
+
+<section class="border rounded p-3 mt-3">
+    <h2 class="h5">Resource Balances</h2>
+    <div class="row g-2">
+        <div class="col-md-3 col-6">
+            <label for="silver-balance" class="form-label">Silver balance</label>
+            <input id="silver-balance" type="number" min="0" class="form-control" @bind="silverBalance" />
+        </div>
+        <div class="col-md-3 col-6">
+            <label for="aircraft-parts-balance" class="form-label">Aircraft parts balance</label>
+            <input id="aircraft-parts-balance" type="number" min="0" class="form-control" @bind="aircraftPartsBalance" />
+        </div>
+        <div class="col-md-3 col-6">
+            <label for="fuselage-parts-balance" class="form-label">Fuselage parts balance</label>
+            <input id="fuselage-parts-balance" type="number" min="0" class="form-control" @bind="fuselagePartsBalance" />
+        </div>
+        <div class="col-md-3 col-6">
+            <label for="engine-parts-balance" class="form-label">Engine parts balance</label>
+            <input id="engine-parts-balance" type="number" min="0" class="form-control" @bind="enginePartsBalance" />
+        </div>
+        <div class="col-md-3 col-6">
+            <label for="avionics-parts-balance" class="form-label">Avionics parts balance</label>
+            <input id="avionics-parts-balance" type="number" min="0" class="form-control" @bind="avionicsPartsBalance" />
+        </div>
+        <div class="col-md-3 col-6">
+            <label for="cannon-parts-balance" class="form-label">Cannon parts balance</label>
+            <input id="cannon-parts-balance" type="number" min="0" class="form-control" @bind="cannonPartsBalance" />
+        </div>
+        <div class="col-md-3 col-6">
+            <label for="missile-parts-balance" class="form-label">Missile parts balance</label>
+            <input id="missile-parts-balance" type="number" min="0" class="form-control" @bind="missilePartsBalance" />
+        </div>
+        <div class="col-md-3 col-6">
+            <label for="rocket-parts-balance" class="form-label">Rocket parts balance</label>
+            <input id="rocket-parts-balance" type="number" min="0" class="form-control" @bind="rocketPartsBalance" />
+        </div>
+        <div class="col-md-3 col-6">
+            <label for="advanced-parts-balance" class="form-label">Advanced parts balance</label>
+            <input id="advanced-parts-balance" type="number" min="0" class="form-control" @bind="advancedPartsBalance" />
+        </div>
+    </div>
+</section>
+
+<div class="d-flex flex-wrap gap-2 align-items-center my-4">
+    <button class="btn btn-primary btn-lg" @onclick="RunPlanner">Run Planner</button>
+    <button class="btn btn-outline-secondary" @onclick="ExportJson" disabled="@(result is null)">Export JSON</button>
+    <button class="btn btn-outline-secondary" @onclick="ExportMarkdown" disabled="@(result is null)">Export Markdown</button>
+    <button class="btn btn-outline-secondary" @onclick="CopyShareSummary" disabled="@(result is null)">Copy Share Summary</button>
+</div>
+
+@if (result is not null)
+{
+    <section class="mt-4">
+        <h2>Planner Results</h2>
+
+        @if (result.Warnings.Count > 0)
+        {
+            <div class="alert alert-warning">
+                <h3 class="h6">Warnings</h3>
+                <ul class="mb-0">
+                    @foreach (var warning in result.Warnings)
+                    {
+                        <li>@warning</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="border rounded p-3 h-100">
+                    <h3 class="h5">Totals Required</h3>
+                    @foreach (var total in result.TotalsRequired)
+                    {
+                        <div>@total.CurrencyCode @total.Amount.ToString("N0")</div>
+                    }
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="border rounded p-3 h-100">
+                    <h3 class="h5">Deficits</h3>
+                    @if (result.Deficits.Count == 0)
+                    {
+                        <div>No deficits</div>
+                    }
+                    @foreach (var deficit in result.Deficits)
+                    {
+                        <div>@deficit.CurrencyCode deficit @deficit.Amount.ToString("N0")</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+            <div class="col-md-4">
+                <label for="currency-filter" class="form-label">Currency filter</label>
+                <select id="currency-filter" class="form-select" @bind="currencyFilter">
+                    <option value="">All currencies</option>
+                    @foreach (var currency in CurrencyCodes)
+                    {
+                        <option value="@currency">@currency</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check">
+                    <input id="affordable-filter" class="form-check-input" type="checkbox" @bind="affordableOnly" />
+                    <label class="form-check-label" for="affordable-filter">Affordable steps only</label>
+                </div>
+            </div>
+        </div>
+
+        <section class="mt-3">
+            <h3 class="h5">Purchase Steps</h3>
+            <h4 class="h6">Aircraft</h4>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Step</th>
+                        <th>Costs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var step in FilteredSteps)
+                    {
+                        <tr>
+                            <td>@step.Order</td>
+                            <td>@DisplayStepGroup(step.SystemSlotId ?? "aircraft") @step.FromLevel-&gt;@step.ToLevel</td>
+                            <td>@string.Join(", ", step.Costs.Select(c => $"{c.CurrencyCode} {c.Amount:N0}"))</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+    </section>
+}
+
+@if (!string.IsNullOrWhiteSpace(exportText))
+{
+    <section class="mt-3">
+        <label for="export-output" class="form-label">Export output</label>
+        <textarea id="export-output" class="form-control" rows="10" readonly>@exportText</textarea>
+    </section>
+}
+
+@code {
+    private const string StorageKey = "metalstorming20.upgrades2.state";
+
+    private IReadOnlyList<SystemSlotDefinitionV2> systemSlots = PlannerV2.GenericSystemSlots;
+    private readonly List<SystemPlanRow> systemPlans = [];
+    private readonly AircraftLevelPlan aircraftLevelPlan = AircraftLevelPlan.FromLevels(5, 5);
+
+    private int currentAircraftLevel => aircraftLevelPlan.CurrentAircraftLevel;
+    private int targetAircraftLevel => aircraftLevelPlan.TargetAircraftLevel;
+    private int silverBalance;
+    private int aircraftPartsBalance;
+    private int fuselagePartsBalance;
+    private int enginePartsBalance;
+    private int avionicsPartsBalance;
+    private int cannonPartsBalance;
+    private int missilePartsBalance;
+    private int rocketPartsBalance;
+    private int advancedPartsBalance;
+
+    private PlannerResultV2? result;
+    private string? exportText;
+    private string currencyFilter = "";
+    private bool affordableOnly;
+
+    private static readonly string[] CurrencyCodes =
+    [
+        PlannerV2.Currencies.Silver,
+        PlannerV2.Currencies.AircraftParts,
+        PlannerV2.Currencies.FuselageParts,
+        PlannerV2.Currencies.EngineParts,
+        PlannerV2.Currencies.AvionicsParts,
+        PlannerV2.Currencies.CannonParts,
+        PlannerV2.Currencies.MissileParts,
+        PlannerV2.Currencies.RocketParts,
+        PlannerV2.Currencies.AdvancedParts
+    ];
+    private static readonly int[] BranchLevels = [5, 6, 7, 8];
+    private static readonly int[] AircraftLevels = Enumerable.Range(1, 20).ToArray();
+
+    private IEnumerable<PlanStepV2> FilteredSteps => result?.Steps
+        .Where(s => string.IsNullOrEmpty(currencyFilter) || s.Costs.Any(c => c.CurrencyCode == currencyFilter))
+        .Where(s => !affordableOnly || IsAffordable(s))
+        ?? [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var catalog = await CatalogService.GetCatalogAsync();
+        systemSlots = catalog.SystemSlots
+            .Where(s => s.AircraftId == PlannerV2.GenericAircraftId)
+            .DefaultIfEmpty()
+            .Where(s => s is not null)
+            .Cast<SystemSlotDefinitionV2>()
+            .ToArray();
+
+        if (systemSlots.Count == 0)
+        {
+            systemSlots = PlannerV2.GenericSystemSlots;
+        }
+
+        ResetSystemRows();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        var saved = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+        if (string.IsNullOrWhiteSpace(saved))
+        {
+            return;
+        }
+
+        var state = JsonSerializer.Deserialize<Upgrades2LocalState>(saved);
+        if (state?.SchemaVersion != 2)
+        {
+            return;
+        }
+
+        aircraftLevelPlan.LoadLevels(state.CurrentAircraftLevel, state.TargetAircraftLevel);
+        silverBalance = state.SilverBalance;
+        aircraftPartsBalance = state.AircraftPartsBalance;
+        fuselagePartsBalance = state.FuselagePartsBalance;
+        enginePartsBalance = state.EnginePartsBalance;
+        avionicsPartsBalance = state.AvionicsPartsBalance;
+        cannonPartsBalance = state.CannonPartsBalance;
+        missilePartsBalance = state.MissilePartsBalance;
+        rocketPartsBalance = state.RocketPartsBalance;
+        advancedPartsBalance = state.AdvancedPartsBalance;
+
+        foreach (var savedSystem in state.SystemPlans ?? [])
+        {
+            var row = systemPlans.FirstOrDefault(p => p.SystemSlotId == savedSystem.SystemSlotId);
+            if (row is null)
+            {
+                continue;
+            }
+
+            row.LoadState(savedSystem);
+            row.NormalizeSelection();
+        }
+
+        StateHasChanged();
+    }
+
+    private void ResetSystemRows()
+    {
+        systemPlans.Clear();
+        systemPlans.AddRange(systemSlots.Select(SystemPlanRow.FromSlot));
+    }
+
+    private async Task RunPlanner()
+    {
+        NormalizeInputs();
+        result = PlannerV2.Plan(BuildRequest());
+        exportText = null;
+        await SaveState();
+    }
+
+    private void ExportJson()
+    {
+        if (result is null)
+        {
+            return;
+        }
+
+        var payload = new
+        {
+            schemaVersion = 2,
+            currentState = BuildRequest(),
+            plannerResult = result
+        };
+        exportText = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    private void ExportMarkdown()
+    {
+        exportText = BuildMarkdownSummary();
+    }
+
+    private async Task CopyShareSummary()
+    {
+        exportText = BuildMarkdownSummary();
+        if (!string.IsNullOrWhiteSpace(exportText))
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", exportText);
+        }
+    }
+
+    private string BuildMarkdownSummary()
+    {
+        if (result is null)
+        {
+            return "";
+        }
+
+        var lines = new List<string>
+        {
+            "# MetalStorming20 Upgrades 2.0 Plan",
+            "",
+            "## Target",
+            $"- Aircraft level: {currentAircraftLevel}->{targetAircraftLevel}",
+            "",
+            "## System Tracks"
+        };
+
+        lines.AddRange(systemPlans.Select(row => $"- {row.DisplayName}: {SelectedNodeSummary(row)}"));
+        lines.Add("");
+        lines.Add("## Totals Required");
+        lines.AddRange(result.TotalsRequired.Select(t => $"- {t.CurrencyCode}: {t.Amount:N0}"));
+        lines.Add("");
+        lines.Add("## Deficits");
+        lines.AddRange(result.Deficits.Count == 0
+            ? ["- None"]
+            : result.Deficits.Select(d => $"- {d.CurrencyCode}: {d.Amount:N0}"));
+        lines.Add("");
+        lines.Add("## Purchase Steps");
+        lines.AddRange(result.Steps.Select(s => $"- {s.Order}. {DisplayStepGroup(s.SystemSlotId ?? "aircraft")} {s.FromLevel}->{s.ToLevel}: {string.Join(", ", s.Costs.Select(c => $"{c.CurrencyCode} {c.Amount:N0}"))}"));
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private PlannerRequestV2 BuildRequest()
+    {
+        return new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, currentAircraftLevel)],
+            OwnedSystemNodes: systemPlans.SelectMany(BuildOwnedNodes).ToArray(),
+            EquippedSystemBranches: systemPlans.SelectMany(BuildEquippedBranches).ToArray(),
+            ResourceBalances: BuildBalances(),
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, targetAircraftLevel)],
+            SystemTargets: systemPlans.Select(p => new SystemTargetV2(
+                p.SystemSlotId,
+                p.TargetSystemLevel,
+                p.BranchOwnershipMode,
+                BuildBranchTargets(p))).ToArray(),
+            SystemSlots: systemSlots);
+    }
+
+    private static IReadOnlyDictionary<int, string>? BuildBranchTargets(SystemPlanRow row)
+    {
+        return row.TargetSystemLevel >= 5
+            ? Enumerable.Range(5, row.TargetSystemLevel - 4).ToDictionary(level => level, level => row.SelectedBranchFor(level) ?? "A")
+            : null;
+    }
+
+    private static IEnumerable<OwnedSystemNodeV2> BuildOwnedNodes(SystemPlanRow row) =>
+        row.HasNodes.Select(node => new OwnedSystemNodeV2(row.SystemSlotId, SystemPlanRow.ParseLevel(node), SystemPlanRow.ParseBranch(node)));
+
+    private static IEnumerable<EquippedSystemBranchV2> BuildEquippedBranches(SystemPlanRow row) =>
+        row.HasNodes
+            .Select(node => new { Level = SystemPlanRow.ParseLevel(node), Branch = SystemPlanRow.ParseBranch(node) })
+            .Where(node => node.Level >= 5 && node.Branch is not null)
+            .GroupBy(node => node.Level)
+            .Select(group => group.OrderBy(node => node.Branch, StringComparer.OrdinalIgnoreCase).First())
+            .Select(node => new EquippedSystemBranchV2(row.SystemSlotId, node.Level, node.Branch!));
+
+    private IReadOnlyList<ResourceBalanceV2> BuildBalances() =>
+    [
+        new(PlannerV2.Currencies.Silver, silverBalance),
+        new(PlannerV2.Currencies.AircraftParts, aircraftPartsBalance),
+        new(PlannerV2.Currencies.FuselageParts, fuselagePartsBalance),
+        new(PlannerV2.Currencies.EngineParts, enginePartsBalance),
+        new(PlannerV2.Currencies.AvionicsParts, avionicsPartsBalance),
+        new(PlannerV2.Currencies.CannonParts, cannonPartsBalance),
+        new(PlannerV2.Currencies.MissileParts, missilePartsBalance),
+        new(PlannerV2.Currencies.RocketParts, rocketPartsBalance),
+        new(PlannerV2.Currencies.AdvancedParts, advancedPartsBalance)
+    ];
+
+    private async Task SaveState()
+    {
+        var state = new Upgrades2LocalState(
+            2,
+            currentAircraftLevel,
+            targetAircraftLevel,
+            systemPlans.Select(SystemPlanState.FromRow).ToArray(),
+            silverBalance,
+            aircraftPartsBalance,
+            fuselagePartsBalance,
+            enginePartsBalance,
+            avionicsPartsBalance,
+            cannonPartsBalance,
+            missilePartsBalance,
+            rocketPartsBalance,
+            advancedPartsBalance);
+
+        await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, JsonSerializer.Serialize(state));
+    }
+
+    private bool IsAffordable(PlanStepV2 step)
+    {
+        var balances = BuildBalances().ToDictionary(b => b.CurrencyCode, b => b.Amount);
+        return step.Costs.All(c => balances.TryGetValue(c.CurrencyCode, out var balance) && balance >= c.Amount);
+    }
+
+    private void NormalizeInputs()
+    {
+        aircraftLevelPlan.NormalizeSelection();
+
+        foreach (var row in systemPlans)
+        {
+            row.NormalizeSelection();
+        }
+
+        silverBalance = Math.Max(0, silverBalance);
+        aircraftPartsBalance = Math.Max(0, aircraftPartsBalance);
+        fuselagePartsBalance = Math.Max(0, fuselagePartsBalance);
+        enginePartsBalance = Math.Max(0, enginePartsBalance);
+        avionicsPartsBalance = Math.Max(0, avionicsPartsBalance);
+        cannonPartsBalance = Math.Max(0, cannonPartsBalance);
+        missilePartsBalance = Math.Max(0, missilePartsBalance);
+        rocketPartsBalance = Math.Max(0, rocketPartsBalance);
+        advancedPartsBalance = Math.Max(0, advancedPartsBalance);
+    }
+
+    private string DisplayStepGroup(string id) => id == "aircraft"
+        ? "Aircraft"
+        : systemPlans.FirstOrDefault(s => s.SystemSlotId == id)?.DisplayName ?? id;
+
+    private static string Slug(string value) =>
+        value.ToLowerInvariant()
+            .Replace("/", "-", StringComparison.Ordinal)
+            .Replace(" ", "-", StringComparison.Ordinal);
+
+    private static string NodeButtonClass(SystemPlanRow row, int level, string? branchCode) =>
+        row.StateFor(level, branchCode) switch
+        {
+            NodeToggleState.Desired => "node-toggle desired",
+            NodeToggleState.Has => "node-toggle has",
+            _ => "node-toggle"
+        };
+
+    private static string NodeStateValue(SystemPlanRow row, int level, string? branchCode) =>
+        row.StateFor(level, branchCode) switch
+        {
+            NodeToggleState.Desired => "desired",
+            NodeToggleState.Has => "has",
+            _ => "off"
+        };
+
+    private string AircraftLevelButtonClass(int level) =>
+        aircraftLevelPlan.StateFor(level) switch
+        {
+            NodeToggleState.Desired => "node-toggle desired",
+            NodeToggleState.Has => "node-toggle has",
+            _ => "node-toggle"
+        };
+
+    private string AircraftLevelStateValue(int level) =>
+        aircraftLevelPlan.StateFor(level) switch
+        {
+            NodeToggleState.Desired => "desired",
+            NodeToggleState.Has => "has",
+            _ => "off"
+        };
+
+    private void CycleAircraftLevel(int level)
+    {
+        aircraftLevelPlan.Cycle(level);
+    }
+
+    private static void CycleNode(SystemPlanRow row, int level, string? branchCode)
+    {
+        row.Cycle(level, branchCode);
+    }
+
+    private static string NodeLabel(int level, string branchCode) => $"{level}{branchCode}";
+
+    private static string SelectedNodeSummary(SystemPlanRow row) =>
+        row.TargetNodes.Count == 0
+            ? "none"
+            : string.Join(", ", row.TargetNodes.OrderBy(SystemPlanRow.ParseLevel).ThenBy(node => node, StringComparer.OrdinalIgnoreCase).Select(node =>
+                row.StateFor(node) == NodeToggleState.Has ? $"{node} has" : $"{node} desired"));
+
+    private enum NodeToggleState
+    {
+        Off,
+        Desired,
+        Has
+    }
+
+    private sealed class AircraftLevelPlan
+    {
+        public Dictionary<int, NodeToggleState> LevelStates { get; } = [];
+
+        public int CurrentAircraftLevel
+        {
+            get
+            {
+                var hasLevels = LevelStates
+                    .Where(level => level.Value == NodeToggleState.Has)
+                    .Select(level => level.Key)
+                    .ToArray();
+
+                return hasLevels.Length == 0 ? 1 : hasLevels.Max();
+            }
+        }
+
+        public int TargetAircraftLevel
+        {
+            get
+            {
+                var targetLevels = LevelStates
+                    .Where(level => level.Value is NodeToggleState.Desired or NodeToggleState.Has)
+                    .Select(level => level.Key)
+                    .ToArray();
+
+                return targetLevels.Length == 0 ? 1 : targetLevels.Max();
+            }
+        }
+
+        public static AircraftLevelPlan FromLevels(int currentLevel, int targetLevel)
+        {
+            var plan = new AircraftLevelPlan();
+            plan.LoadLevels(currentLevel, targetLevel);
+            return plan;
+        }
+
+        public bool IsTarget(int level) => StateFor(level) is NodeToggleState.Desired or NodeToggleState.Has;
+
+        public NodeToggleState StateFor(int level) =>
+            LevelStates.TryGetValue(level, out var state) ? state : NodeToggleState.Off;
+
+        public void Cycle(int level)
+        {
+            level = Math.Clamp(level, 1, 20);
+            var nextState = StateFor(level) switch
+            {
+                NodeToggleState.Off => NodeToggleState.Desired,
+                NodeToggleState.Desired => NodeToggleState.Has,
+                _ => NodeToggleState.Off
+            };
+
+            if (nextState == NodeToggleState.Off)
+            {
+                LevelStates.Remove(level);
+            }
+            else
+            {
+                LevelStates[level] = nextState;
+            }
+
+            if (nextState == NodeToggleState.Desired && !HasOwnedPrerequisitePath(level))
+            {
+                MarkPrerequisitePathAsOwned(level);
+            }
+
+            NormalizeSelection();
+        }
+
+        public void LoadLevels(int currentLevel, int targetLevel)
+        {
+            LevelStates.Clear();
+
+            currentLevel = Math.Clamp(currentLevel, 1, 20);
+            targetLevel = Math.Clamp(targetLevel, currentLevel, 20);
+
+            for (var level = 1; level <= currentLevel; level++)
+            {
+                LevelStates[level] = NodeToggleState.Has;
+            }
+
+            for (var level = currentLevel + 1; level <= targetLevel; level++)
+            {
+                LevelStates[level] = NodeToggleState.Desired;
+            }
+        }
+
+        public void NormalizeSelection()
+        {
+            var targetLevel = TargetAircraftLevel;
+            var currentLevel = CurrentAircraftLevel;
+
+            if (targetLevel < currentLevel)
+            {
+                targetLevel = currentLevel;
+            }
+
+            for (var level = 1; level <= currentLevel; level++)
+            {
+                LevelStates[level] = NodeToggleState.Has;
+            }
+
+            for (var level = currentLevel + 1; level <= targetLevel; level++)
+            {
+                if (StateFor(level) == NodeToggleState.Off)
+                {
+                    LevelStates[level] = NodeToggleState.Desired;
+                }
+            }
+
+            foreach (var level in LevelStates.Keys.Where(level => level > targetLevel).ToArray())
+            {
+                LevelStates.Remove(level);
+            }
+        }
+
+        private bool HasOwnedPrerequisitePath(int level)
+        {
+            for (var prerequisiteLevel = 1; prerequisiteLevel < level; prerequisiteLevel++)
+            {
+                if (StateFor(prerequisiteLevel) != NodeToggleState.Has)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void MarkPrerequisitePathAsOwned(int level)
+        {
+            for (var prerequisiteLevel = 1; prerequisiteLevel < level; prerequisiteLevel++)
+            {
+                LevelStates[prerequisiteLevel] = NodeToggleState.Has;
+            }
+        }
+    }
+
+    private sealed class SystemPlanRow
+    {
+        public string Id { get; } = Guid.NewGuid().ToString("N");
+        public string SystemSlotId { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public Dictionary<string, NodeToggleState> NodeStates { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyList<string> TargetNodes => NodeStates
+            .Where(node => node.Value is NodeToggleState.Desired or NodeToggleState.Has)
+            .Select(node => node.Key)
+            .ToArray();
+        public IReadOnlyList<string> HasNodes => NodeStates
+            .Where(node => node.Value == NodeToggleState.Has)
+            .Select(node => node.Key)
+            .ToArray();
+
+        public int TargetSystemLevel
+        {
+            get
+            {
+                var selectedLevels = TargetNodes.Select(ParseLevel).Where(level => level > 0).ToArray();
+                return selectedLevels.Length == 0 ? 0 : selectedLevels.Max();
+            }
+        }
+
+        public BranchOwnershipMode BranchOwnershipMode =>
+            BranchLevels.Any(level => IsTarget(level, "A") && IsTarget(level, "B"))
+                ? BranchOwnershipMode.Both
+                : BranchOwnershipMode.ChosenOnly;
+
+        public static SystemPlanRow FromSlot(SystemSlotDefinitionV2 slot) =>
+            new()
+            {
+                SystemSlotId = slot.SystemSlotId,
+                DisplayName = slot.DisplayName
+            };
+
+        public bool IsTarget(int level, string? branchCode) => StateFor(level, branchCode) is NodeToggleState.Desired or NodeToggleState.Has;
+
+        public NodeToggleState StateFor(int level, string? branchCode) => StateFor(NodeKey(level, branchCode));
+
+        public NodeToggleState StateFor(string nodeKey) =>
+            NodeStates.TryGetValue(nodeKey, out var state) ? state : NodeToggleState.Off;
+
+        public void Cycle(int level, string? branchCode)
+        {
+            var key = NodeKey(level, branchCode);
+            var nextState = StateFor(key) switch
+            {
+                NodeToggleState.Off => NodeToggleState.Desired,
+                NodeToggleState.Desired => NodeToggleState.Has,
+                _ => NodeToggleState.Off
+            };
+
+            if (nextState == NodeToggleState.Off)
+            {
+                NodeStates.Remove(key);
+            }
+            else
+            {
+                NodeStates[key] = nextState;
+            }
+
+            if (nextState == NodeToggleState.Desired && level >= 5 && !HasOwnedPrerequisitePath(level, branchCode))
+            {
+                MarkPrerequisitePathAsOwned(level, branchCode);
+            }
+
+            NormalizeSelection();
+        }
+
+        public string? SelectedBranchFor(int level)
+        {
+            if (IsTarget(level, "A"))
+            {
+                return "A";
+            }
+
+            return IsTarget(level, "B") ? "B" : null;
+        }
+
+        public void NormalizeSelection()
+        {
+            var maxLevel = TargetSystemLevel;
+            for (var level = 1; level <= Math.Min(maxLevel, 4); level++)
+            {
+                EnsureAtLeastDesired(level, null);
+            }
+
+            if (maxLevel >= 5)
+            {
+                for (var level = 5; level <= maxLevel; level++)
+                {
+                    if (!IsTarget(level, "A") && !IsTarget(level, "B"))
+                    {
+                        EnsureAtLeastDesired(level, "A");
+                    }
+                }
+            }
+        }
+
+        public void LoadState(SystemPlanState savedSystem)
+        {
+            NodeStates.Clear();
+
+            foreach (var node in savedSystem.SelectedNodes ?? [])
+            {
+                NodeStates[node] = NodeToggleState.Desired;
+            }
+
+            if (savedSystem.NodeStates is null)
+            {
+                return;
+            }
+
+            foreach (var node in savedSystem.NodeStates)
+            {
+                NodeStates[node.Key] = node.Value.Equals("has", StringComparison.OrdinalIgnoreCase)
+                    ? NodeToggleState.Has
+                    : NodeToggleState.Desired;
+            }
+        }
+
+        private void EnsureAtLeastDesired(int level, string? branchCode)
+        {
+            var key = NodeKey(level, branchCode);
+            if (StateFor(key) == NodeToggleState.Off)
+            {
+                NodeStates[key] = NodeToggleState.Desired;
+            }
+        }
+
+        private bool HasOwnedPrerequisitePath(int level, string? branchCode)
+        {
+            if (level <= 1)
+            {
+                return true;
+            }
+
+            for (var trunkLevel = 1; trunkLevel <= Math.Min(level - 1, 4); trunkLevel++)
+            {
+                if (StateFor(trunkLevel, null) != NodeToggleState.Has)
+                {
+                    return false;
+                }
+            }
+
+            if (level <= 5)
+            {
+                return true;
+            }
+
+            var branch = branchCode ?? "A";
+            for (var branchLevel = 5; branchLevel < level; branchLevel++)
+            {
+                if (StateFor(branchLevel, "A") != NodeToggleState.Has &&
+                    StateFor(branchLevel, "B") != NodeToggleState.Has)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void MarkPrerequisitePathAsOwned(int level, string? branchCode)
+        {
+            for (var trunkLevel = 1; trunkLevel <= Math.Min(level - 1, 4); trunkLevel++)
+            {
+                NodeStates[NodeKey(trunkLevel, null)] = NodeToggleState.Has;
+            }
+
+            if (level <= 5)
+            {
+                return;
+            }
+
+            var branch = branchCode ?? "A";
+            for (var branchLevel = 5; branchLevel < level; branchLevel++)
+            {
+                if (StateFor(branchLevel, "A") != NodeToggleState.Has &&
+                    StateFor(branchLevel, "B") != NodeToggleState.Has)
+                {
+                    NodeStates[NodeKey(branchLevel, branch)] = NodeToggleState.Has;
+                }
+            }
+        }
+
+        private static string NodeKey(int level, string? branchCode) =>
+            branchCode is null ? level.ToString() : $"{level}{branchCode}";
+
+        public static int ParseLevel(string key) =>
+            int.TryParse(key[..1], out var level) ? level : 0;
+
+        public static string? ParseBranch(string key) =>
+            key.Length > 1 ? key[1..].ToUpperInvariant() : null;
+    }
+
+    private sealed record SystemPlanState(
+        string SystemSlotId,
+        IReadOnlyList<string>? SelectedNodes,
+        IReadOnlyDictionary<string, string>? NodeStates)
+    {
+        public static SystemPlanState FromRow(SystemPlanRow row) =>
+            new(
+                row.SystemSlotId,
+                row.TargetNodes.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
+                row.NodeStates
+                    .Where(node => node.Value is NodeToggleState.Desired or NodeToggleState.Has)
+                    .OrderBy(node => node.Key, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        node => node.Key,
+                        node => node.Value == NodeToggleState.Has ? "has" : "desired",
+                        StringComparer.OrdinalIgnoreCase));
+    }
+
+    private sealed record Upgrades2LocalState(
+        int SchemaVersion,
+        int CurrentAircraftLevel,
+        int TargetAircraftLevel,
+        IReadOnlyList<SystemPlanState>? SystemPlans,
+        int SilverBalance,
+        int AircraftPartsBalance,
+        int FuselagePartsBalance,
+        int EnginePartsBalance,
+        int AvionicsPartsBalance,
+        int CannonPartsBalance,
+        int MissilePartsBalance,
+        int RocketPartsBalance,
+        int AdvancedPartsBalance);
+}

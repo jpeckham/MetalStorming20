@@ -1,0 +1,7 @@
+[
+  { "aircraftMilestoneId": "aircraft_level_6_systems", "aircraftLevel": 6, "milestoneType": "SYSTEM_TRACKS", "displayName": "System Tracks" },
+  { "aircraftMilestoneId": "aircraft_level_8_special", "aircraftLevel": 8, "milestoneType": "SPECIAL_ABILITY_SLOT", "displayName": "Special Ability Slot" },
+  { "aircraftMilestoneId": "aircraft_level_12_passive", "aircraftLevel": 12, "milestoneType": "PASSIVE_SLOT", "displayName": "Passive Slot" },
+  { "aircraftMilestoneId": "aircraft_level_16_mod_1", "aircraftLevel": 16, "milestoneType": "MOD_SLOT_1", "displayName": "Mod Slot 1" },
+  { "aircraftMilestoneId": "aircraft_level_20_mod_2", "aircraftLevel": 20, "milestoneType": "MOD_SLOT_2", "displayName": "Mod Slot 2" }
+]

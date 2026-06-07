@@ -1,0 +1,9 @@
+[
+  { "systemSlotId": "generic_fuselage", "aircraftId": "generic_aircraft", "systemTypeId": "FUSELAGE", "slotLabel": "Fuselage", "slotOrder": 1, "unlockAircraftLevel": 6, "maxSystemLevel": 8, "catalogConfidence": "SEEDED" },
+  { "systemSlotId": "generic_engines", "aircraftId": "generic_aircraft", "systemTypeId": "ENGINES", "slotLabel": "Engines", "slotOrder": 2, "unlockAircraftLevel": 6, "maxSystemLevel": 8, "catalogConfidence": "SEEDED" },
+  { "systemSlotId": "generic_avionics", "aircraftId": "generic_aircraft", "systemTypeId": "AVIONICS", "slotLabel": "Avionics", "slotOrder": 3, "unlockAircraftLevel": 6, "maxSystemLevel": 8, "catalogConfidence": "SEEDED" },
+  { "systemSlotId": "generic_cannons", "aircraftId": "generic_aircraft", "systemTypeId": "CANNONS", "slotLabel": "Cannons", "slotOrder": 4, "unlockAircraftLevel": 6, "maxSystemLevel": 8, "catalogConfidence": "SEEDED" },
+  { "systemSlotId": "generic_main_radar_missile", "aircraftId": "generic_aircraft", "systemTypeId": "MISSILE", "slotLabel": "Main/Radar Missile", "slotOrder": 5, "unlockAircraftLevel": 6, "maxSystemLevel": 8, "catalogConfidence": "SEEDED" },
+  { "systemSlotId": "generic_secondary_ir_missile", "aircraftId": "generic_aircraft", "systemTypeId": "MISSILE", "slotLabel": "Secondary/IR Missile", "slotOrder": 6, "unlockAircraftLevel": 6, "maxSystemLevel": 8, "catalogConfidence": "SEEDED" },
+  { "systemSlotId": "generic_rockets", "aircraftId": "generic_aircraft", "systemTypeId": "ROCKETS", "slotLabel": "Rockets", "slotOrder": 7, "unlockAircraftLevel": 6, "maxSystemLevel": 8, "catalogConfidence": "SEEDED" }
+]

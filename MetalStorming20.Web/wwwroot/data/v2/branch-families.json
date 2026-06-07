@@ -1,0 +1,16 @@
+[
+  { "branchFamilyId": "generic_fuselage_A", "systemSlotId": "generic_fuselage", "branchCode": "A", "displayName": "Branch A", "sortOrder": 1 },
+  { "branchFamilyId": "generic_fuselage_B", "systemSlotId": "generic_fuselage", "branchCode": "B", "displayName": "Branch B", "sortOrder": 2 },
+  { "branchFamilyId": "generic_engines_A", "systemSlotId": "generic_engines", "branchCode": "A", "displayName": "Branch A", "sortOrder": 1 },
+  { "branchFamilyId": "generic_engines_B", "systemSlotId": "generic_engines", "branchCode": "B", "displayName": "Branch B", "sortOrder": 2 },
+  { "branchFamilyId": "generic_avionics_A", "systemSlotId": "generic_avionics", "branchCode": "A", "displayName": "Branch A", "sortOrder": 1 },
+  { "branchFamilyId": "generic_avionics_B", "systemSlotId": "generic_avionics", "branchCode": "B", "displayName": "Branch B", "sortOrder": 2 },
+  { "branchFamilyId": "generic_cannons_A", "systemSlotId": "generic_cannons", "branchCode": "A", "displayName": "Branch A", "sortOrder": 1 },
+  { "branchFamilyId": "generic_cannons_B", "systemSlotId": "generic_cannons", "branchCode": "B", "displayName": "Branch B", "sortOrder": 2 },
+  { "branchFamilyId": "generic_main_radar_missile_A", "systemSlotId": "generic_main_radar_missile", "branchCode": "A", "displayName": "Branch A", "sortOrder": 1 },
+  { "branchFamilyId": "generic_main_radar_missile_B", "systemSlotId": "generic_main_radar_missile", "branchCode": "B", "displayName": "Branch B", "sortOrder": 2 },
+  { "branchFamilyId": "generic_secondary_ir_missile_A", "systemSlotId": "generic_secondary_ir_missile", "branchCode": "A", "displayName": "Branch A", "sortOrder": 1 },
+  { "branchFamilyId": "generic_secondary_ir_missile_B", "systemSlotId": "generic_secondary_ir_missile", "branchCode": "B", "displayName": "Branch B", "sortOrder": 2 },
+  { "branchFamilyId": "generic_rockets_A", "systemSlotId": "generic_rockets", "branchCode": "A", "displayName": "Branch A", "sortOrder": 1 },
+  { "branchFamilyId": "generic_rockets_B", "systemSlotId": "generic_rockets", "branchCode": "B", "displayName": "Branch B", "sortOrder": 2 }
+]

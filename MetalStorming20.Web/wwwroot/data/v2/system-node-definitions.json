@@ -1,0 +1,14 @@
+[
+  { "systemNodeId": "generic_1", "systemSlotId": "*", "systemLevel": 1, "branchCode": null, "displayName": "Level 1", "bonusSummary": null, "rawBonusJson": null, "isChoiceNode": false },
+  { "systemNodeId": "generic_2", "systemSlotId": "*", "systemLevel": 2, "branchCode": null, "displayName": "Level 2", "bonusSummary": null, "rawBonusJson": null, "isChoiceNode": false },
+  { "systemNodeId": "generic_3", "systemSlotId": "*", "systemLevel": 3, "branchCode": null, "displayName": "Level 3", "bonusSummary": null, "rawBonusJson": null, "isChoiceNode": false },
+  { "systemNodeId": "generic_4", "systemSlotId": "*", "systemLevel": 4, "branchCode": null, "displayName": "Level 4", "bonusSummary": null, "rawBonusJson": null, "isChoiceNode": false },
+  { "systemNodeId": "generic_5_A", "systemSlotId": "*", "systemLevel": 5, "branchCode": "A", "displayName": "Level 5 Branch A", "bonusSummary": null, "rawBonusJson": null, "isChoiceNode": true },
+  { "systemNodeId": "generic_5_B", "systemSlotId": "*", "systemLevel": 5, "branchCode": "B", "displayName": "Level 5 Branch B", "bonusSummary": null, "rawBonusJson": null, "isChoiceNode": true },
+  { "systemNodeId": "generic_6_A", "systemSlotId": "*", "systemLevel": 6, "branchCode": "A", "displayName": "Level 6 Branch A", "bonusSummary": null, "rawBonusJson": null, "isChoiceNode": true },
+  { "systemNodeId": "generic_6_B", "systemSlotId": "*", "systemLevel": 6, "branchCode": "B", "displayName": "Level 6 Branch B", "bonusSummary": null, "rawBonusJson": null, "isChoiceNode": true },
+  { "systemNodeId": "generic_7_A", "systemSlotId": "*", "systemLevel": 7, "branchCode": "A", "displayName": "Level 7 Branch A", "bonusSummary": null, "rawBonusJson": null, "isChoiceNode": true },
+  { "systemNodeId": "generic_7_B", "systemSlotId": "*", "systemLevel": 7, "branchCode": "B", "displayName": "Level 7 Branch B", "bonusSummary": null, "rawBonusJson": null, "isChoiceNode": true },
+  { "systemNodeId": "generic_8_A", "systemSlotId": "*", "systemLevel": 8, "branchCode": "A", "displayName": "Level 8 Branch A", "bonusSummary": null, "rawBonusJson": null, "isChoiceNode": true },
+  { "systemNodeId": "generic_8_B", "systemSlotId": "*", "systemLevel": 8, "branchCode": "B", "displayName": "Level 8 Branch B", "bonusSummary": null, "rawBonusJson": null, "isChoiceNode": true }
+]

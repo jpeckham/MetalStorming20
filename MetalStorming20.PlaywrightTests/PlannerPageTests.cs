@@ -12,25 +12,191 @@ public class PlannerPageTests : PageTest
         TestContext.Properties["BaseUrl"] as string ??
         throw new NullReferenceException("BaseURL");
 
+    private async Task MarkAircraftLevelAsHas(int level)
+    {
+        var aircraftLevel = Page
+            .GetByRole(AriaRole.Group, new() { Name = "Aircraft level nodes" })
+            .GetByRole(AriaRole.Button, new() { Name = level.ToString(), Exact = true });
+
+        await aircraftLevel.ClickAsync();
+        await aircraftLevel.ClickAsync();
+    }
+
     [TestMethod]
-    public async Task HomePageLoadsAndCalculates()
+    public async Task HomePageLoadsNewPlannerWithoutNavigation()
     {
         await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
 
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "MetalStorm Planner" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Upgrades 2.0 Planner" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Navigation)).ToHaveCountAsync(0);
+        await Expect(Page.GetByText("MetalStorm Planner")).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Rowheader, new() { Name = "Main/Radar Missile" })).ToBeVisibleAsync();
+    }
 
-        var numericInputs = Page.Locator("input.form-control[type='number']");
-        await Expect(numericInputs).ToHaveCountAsync(5);
-        await numericInputs.Nth(0).FillAsync("5");
-        await numericInputs.Nth(1).FillAsync("3");
-        await numericInputs.Nth(2).FillAsync("6");
-        await numericInputs.Nth(3).FillAsync("2000");
-        await numericInputs.Nth(4).FillAsync("500000");
+    [TestMethod]
+    public async Task Upgrades2PageLoadsAndCalculates()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
 
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Calculate Requirements" }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Upgrades 2.0 Planner" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Add Aircraft" })).ToHaveCountAsync(0);
+        await Expect(Page.GetByLabel("Aircraft", new() { Exact = true })).ToHaveCountAsync(0);
 
-        await Expect(Page.GetByText("Requirements from Level 5 → 20")).ToBeVisibleAsync();
-        await Expect(Page.GetByText("Future Mastery Rewards")).ToBeVisibleAsync();
-        await Expect(Page.GetByText("Remaining Needed from NON-MASTERY Sources")).ToBeVisibleAsync();
+        var engines = Page.GetByTestId("system-engines");
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "1" })).ToBeVisibleAsync();
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "5A" })).ToBeVisibleAsync();
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "5B" })).ToBeVisibleAsync();
+        await engines.GetByRole(AriaRole.Button, new() { Name = "1" }).ClickAsync();
+        await engines.GetByRole(AriaRole.Button, new() { Name = "2" }).ClickAsync();
+        await engines.GetByRole(AriaRole.Button, new() { Name = "3" }).ClickAsync();
+        await Page.GetByLabel("Silver balance").FillAsync("2000");
+        await Page.GetByLabel("Aircraft parts balance").FillAsync("100");
+        await Page.GetByLabel("Engine parts balance").FillAsync("500");
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Run Planner" }).ClickAsync();
+
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Planner Results" })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("SILVER 2,900")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("AIRCRAFT_PARTS 225", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("ENGINE_PARTS 950", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("SILVER deficit 900")).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Aircraft", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Aircraft 5->6")).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Export JSON" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Export Markdown" })).ToBeVisibleAsync();
+    }
+
+    [TestMethod]
+    public async Task Upgrades2GenericSystemRowsShowAllUpgradeTypesAndCopyShareSummary()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        await Expect(Page.GetByRole(AriaRole.Rowheader, new() { Name = "Fuselage" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Rowheader, new() { Name = "Engines" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Rowheader, new() { Name = "Avionics" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Rowheader, new() { Name = "Cannons" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Rowheader, new() { Name = "Main/Radar Missile" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Rowheader, new() { Name = "Secondary/IR Missile" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Rowheader, new() { Name = "Rockets" })).ToBeVisibleAsync();
+
+        await MarkAircraftLevelAsHas(6);
+        await Page.GetByTestId("system-cannons").GetByRole(AriaRole.Button, new() { Name = "1" }).ClickAsync();
+        await Page.GetByTestId("system-main-radar-missile").GetByRole(AriaRole.Button, new() { Name = "1" }).ClickAsync();
+        await Page.GetByTestId("system-secondary-ir-missile").GetByRole(AriaRole.Button, new() { Name = "1" }).ClickAsync();
+        await Page.GetByTestId("system-rockets").GetByRole(AriaRole.Button, new() { Name = "1" }).ClickAsync();
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Run Planner" }).ClickAsync();
+
+        await Expect(Page.GetByText("SILVER 1,600")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("CANNON_PARTS 200", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("MISSILE_PARTS 400", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("ROCKET_PARTS 200", new() { Exact = true })).ToBeVisibleAsync();
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Copy Share Summary" }).ClickAsync();
+        await Expect(Page.GetByLabel("Export output")).ToContainTextAsync("# MetalStorming20 Upgrades 2.0 Plan");
+        await Expect(Page.GetByLabel("Export output")).ToContainTextAsync("Main/Radar Missile");
+        await Expect(Page.GetByLabel("Export output")).ToContainTextAsync("Secondary/IR Missile");
+    }
+
+    [TestMethod]
+    public async Task Upgrades2NodeButtonsTrackHasAndDesiredStates()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        await MarkAircraftLevelAsHas(6);
+
+        var engines = Page.GetByTestId("system-engines");
+        var levelOne = engines.GetByRole(AriaRole.Button, new() { Name = "1" });
+        var levelTwo = engines.GetByRole(AriaRole.Button, new() { Name = "2" });
+
+        await levelOne.ClickAsync();
+        await Expect(levelOne).ToHaveAttributeAsync("data-state", "desired");
+        await levelOne.ClickAsync();
+        await Expect(levelOne).ToHaveAttributeAsync("data-state", "has");
+        await levelTwo.ClickAsync();
+        await Expect(levelTwo).ToHaveAttributeAsync("data-state", "desired");
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Run Planner" }).ClickAsync();
+
+        await Expect(Page.GetByText("SILVER 600", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("ENGINE_PARTS 300", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Engines 1->2")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Engines 0->1")).ToHaveCountAsync(0);
+    }
+
+    [TestMethod]
+    public async Task Upgrades2AircraftLevelButtonsTrackHasAndDesiredStates()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        var aircraftLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Aircraft level nodes" });
+        var levelEight = aircraftLevels.GetByRole(AriaRole.Button, new() { Name = "8", Exact = true });
+
+        await levelEight.ClickAsync();
+
+        foreach (var level in Enumerable.Range(1, 7))
+        {
+            await Expect(aircraftLevels.GetByRole(AriaRole.Button, new() { Name = level.ToString(), Exact = true })).ToHaveAttributeAsync("data-state", "has");
+        }
+
+        await Expect(levelEight).ToHaveAttributeAsync("data-state", "desired");
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Run Planner" }).ClickAsync();
+
+        await Expect(Page.GetByText("Aircraft 7->8")).ToBeVisibleAsync();
+    }
+
+    [TestMethod]
+    public async Task Upgrades2JumpingToBranchNodeFillsPrerequisitesAsOwned()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        await Expect(Page.GetByText("Green owned nodes are your current state.")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Blue desired nodes are your target state.")).ToBeVisibleAsync();
+
+        var engines = Page.GetByTestId("system-engines");
+        await engines.GetByRole(AriaRole.Button, new() { Name = "7A" }).ClickAsync();
+
+        foreach (var node in new[] { "1", "2", "3", "4", "5A", "6A" })
+        {
+            await Expect(engines.GetByRole(AriaRole.Button, new() { Name = node })).ToHaveAttributeAsync("data-state", "has");
+        }
+
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "7A" })).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "5B" })).ToHaveAttributeAsync("data-state", "off");
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "6B" })).ToHaveAttributeAsync("data-state", "off");
+    }
+
+    [TestMethod]
+    public async Task Upgrades2SwitchingBranchesDoesNotFillAlternateBranchPrerequisitesWhenLevelPathIsOwned()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        var engines = Page.GetByTestId("system-engines");
+        await engines.GetByRole(AriaRole.Button, new() { Name = "6A" }).ClickAsync();
+        await engines.GetByRole(AriaRole.Button, new() { Name = "6A" }).ClickAsync();
+
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "5A" })).ToHaveAttributeAsync("data-state", "has");
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "6A" })).ToHaveAttributeAsync("data-state", "has");
+
+        await engines.GetByRole(AriaRole.Button, new() { Name = "7B" }).ClickAsync();
+
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "7B" })).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "5B" })).ToHaveAttributeAsync("data-state", "off");
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "6B" })).ToHaveAttributeAsync("data-state", "off");
     }
 }

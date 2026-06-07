@@ -1,0 +1,11 @@
+[
+  {
+    "aircraftId": "generic_aircraft",
+    "displayName": "Generic Aircraft",
+    "classCode": "GENERIC",
+    "hangarLevelUnlock": null,
+    "isOwnedSupported": true,
+    "sortOrder": 1,
+    "dataConfidence": "SEEDED"
+  }
+]

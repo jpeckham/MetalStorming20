@@ -1,0 +1,11 @@
+[
+  { "currencyCode": "SILVER", "displayName": "Silver", "sortOrder": 1, "isActive": true },
+  { "currencyCode": "AIRCRAFT_PARTS", "displayName": "Aircraft Parts", "sortOrder": 2, "isActive": true },
+  { "currencyCode": "FUSELAGE_PARTS", "displayName": "Fuselage Parts", "sortOrder": 3, "isActive": true },
+  { "currencyCode": "ENGINE_PARTS", "displayName": "Engine Parts", "sortOrder": 4, "isActive": true },
+  { "currencyCode": "AVIONICS_PARTS", "displayName": "Avionics Parts", "sortOrder": 5, "isActive": true },
+  { "currencyCode": "CANNON_PARTS", "displayName": "Cannon Parts", "sortOrder": 6, "isActive": true },
+  { "currencyCode": "MISSILE_PARTS", "displayName": "Missile Parts", "sortOrder": 7, "isActive": true },
+  { "currencyCode": "ROCKET_PARTS", "displayName": "Rocket Parts", "sortOrder": 8, "isActive": true },
+  { "currencyCode": "ADVANCED_PARTS", "displayName": "Advanced Parts", "sortOrder": 9, "isActive": true }
+]

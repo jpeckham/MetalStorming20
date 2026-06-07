@@ -1,0 +1,8 @@
+[
+  { "systemTypeId": "FUSELAGE", "displayName": "Fuselage", "currencyCode": "FUSELAGE_PARTS", "isCoreSystem": true, "allowsDuplicateSlots": false },
+  { "systemTypeId": "ENGINES", "displayName": "Engines", "currencyCode": "ENGINE_PARTS", "isCoreSystem": true, "allowsDuplicateSlots": false },
+  { "systemTypeId": "AVIONICS", "displayName": "Avionics", "currencyCode": "AVIONICS_PARTS", "isCoreSystem": true, "allowsDuplicateSlots": false },
+  { "systemTypeId": "CANNONS", "displayName": "Cannons", "currencyCode": "CANNON_PARTS", "isCoreSystem": false, "allowsDuplicateSlots": true },
+  { "systemTypeId": "MISSILE", "displayName": "Missile", "currencyCode": "MISSILE_PARTS", "isCoreSystem": false, "allowsDuplicateSlots": true },
+  { "systemTypeId": "ROCKETS", "displayName": "Rockets", "currencyCode": "ROCKET_PARTS", "isCoreSystem": false, "allowsDuplicateSlots": true }
+]
