@@ -43,7 +43,14 @@ public class Upgrades2PlannerPresenterTests
                         0,
                         1,
                         [new CurrencyAmountV2(PlannerV2.Currencies.EngineParts, 200)],
-                        "generic_engines")
+                        "generic_engines"),
+                    new PlanStepV2(
+                        3,
+                        PlannerV2.GenericAircraftId,
+                        PlanStepScope.Mastery,
+                        0,
+                        1,
+                        [new CurrencyAmountV2(PlannerV2.Currencies.Gold, 269)])
                 ],
                 MasteryRebate: [new CurrencyAmountV2(PlannerV2.Currencies.Silver, 900)],
                 NetGrindNeeded: [new CurrencyAmountV2(PlannerV2.Currencies.EngineParts, 750)]));
@@ -58,7 +65,7 @@ public class Upgrades2PlannerPresenterTests
         Assert.Equal(["SILVER 900"], result.MasteryRebate.Select(rebate => rebate.DisplayText));
         Assert.Equal(["ENGINE_PARTS 750"], result.NetGrindNeeded.Select(net => net.DisplayText));
         Assert.Equal(
-            ["", PlannerV2.Currencies.Silver, PlannerV2.Currencies.AircraftParts, PlannerV2.Currencies.FuselageParts],
+            ["", PlannerV2.Currencies.Gold, PlannerV2.Currencies.Silver, PlannerV2.Currencies.AircraftParts],
             presenter.ViewModel.CurrencyFilters.Take(4).Select(filter => filter.Value));
         Assert.Collection(
             result.Steps,
@@ -73,6 +80,12 @@ public class Upgrades2PlannerPresenterTests
                 Assert.Equal(2, step.Order);
                 Assert.Equal("Engines 0->1", step.StepText);
                 Assert.Equal("ENGINE_PARTS 200", step.CostsText);
+            },
+            step =>
+            {
+                Assert.Equal(3, step.Order);
+                Assert.Equal("Gold Mastery", step.StepText);
+                Assert.Equal("GOLD 269", step.CostsText);
             });
     }
 }

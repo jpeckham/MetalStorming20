@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using Microsoft.Playwright.MSTest;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -51,6 +52,13 @@ public class PlannerPageTests : PageTest
         await goldButton.ClickAsync();
     }
 
+    private async Task ExpandCostsDetail()
+    {
+        await Page
+            .Locator("[data-testid='costs-summary'] details")
+            .EvaluateAsync("detail => { detail.open = true; }");
+    }
+
     [TestMethod]
     public async Task HomePageLoadsNewPlannerWithoutNavigation()
     {
@@ -83,7 +91,8 @@ public class PlannerPageTests : PageTest
         await MarkSystemNodeAsDesired(engines, "2");
         await MarkSystemNodeAsDesired(engines, "3");
 
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Planner Results" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Costs Summary" })).ToBeVisibleAsync();
+        await ExpandCostsDetail();
         await Expect(Page.GetByText("SILVER 2,900")).ToBeVisibleAsync();
         await Expect(Page.GetByText("AIRCRAFT_PARTS 225", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText("ENGINE_PARTS 950", new() { Exact = true })).ToBeVisibleAsync();
@@ -104,16 +113,47 @@ public class PlannerPageTests : PageTest
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Resource Balances" })).ToHaveCountAsync(0);
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Run Planner" })).ToHaveCountAsync(0);
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Planner Results" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Costs Summary" })).ToBeVisibleAsync();
 
         var engines = Page.GetByTestId("system-engines");
         await MarkSystemNodeAsDesired(engines, "1");
         await MarkSystemNodeAsDesired(engines, "2");
         await MarkSystemNodeAsDesired(engines, "3");
 
+        await ExpandCostsDetail();
         await Expect(Page.GetByText("SILVER 2,900")).ToBeVisibleAsync();
         await Expect(Page.GetByText("AIRCRAFT_PARTS 225", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText("ENGINE_PARTS 950", new() { Exact = true })).ToBeVisibleAsync();
+    }
+
+    [TestMethod]
+    public async Task Upgrades2ShowsCompactCostsSummaryAbovePlannerWithExpandableDetails()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        var engines = Page.GetByTestId("system-engines");
+        await MarkSystemNodeAsDesired(engines, "1");
+        await MarkSystemNodeAsDesired(engines, "2");
+        await MarkSystemNodeAsDesired(engines, "3");
+
+        var summary = Page.GetByTestId("costs-summary");
+        await Expect(summary).ToBeVisibleAsync();
+        await Expect(summary.GetByText("Costs Summary", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(summary.GetByText("2,900 Silver", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(summary.GetByText("225 Aircraft Parts", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(summary.GetByText("950 System Parts", new() { Exact = true })).ToBeVisibleAsync();
+
+        var summaryBox = await summary.BoundingBoxAsync();
+        var aircraftLevelBox = await Page.GetByRole(AriaRole.Heading, new() { Name = "Aircraft Level" }).BoundingBoxAsync();
+        Assert.IsNotNull(summaryBox);
+        Assert.IsNotNull(aircraftLevelBox);
+        Assert.IsTrue(summaryBox.Y < aircraftLevelBox.Y);
+
+        await Expect(Page.GetByText("Aircraft 5->6")).ToBeHiddenAsync();
+        await summary.GetByText("Expand for Detail", new() { Exact = true }).ClickAsync();
+        await Expect(Page.GetByText("Aircraft 5->6")).ToBeVisibleAsync();
     }
 
     [TestMethod]
@@ -137,6 +177,7 @@ public class PlannerPageTests : PageTest
         await MarkSystemNodeAsDesired(Page.GetByTestId("system-secondary-ir-missile"), "1");
         await MarkSystemNodeAsDesired(Page.GetByTestId("system-rockets"), "1");
 
+        await ExpandCostsDetail();
         await Expect(Page.GetByText("SILVER 1,600")).ToBeVisibleAsync();
         await Expect(Page.GetByText("CANNON_PARTS 200", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText("MISSILE_PARTS 400", new() { Exact = true })).ToBeVisibleAsync();
@@ -174,6 +215,7 @@ public class PlannerPageTests : PageTest
         await levelTwo.ClickAsync();
         await Expect(levelTwo).ToHaveAttributeAsync("data-state", "desired");
 
+        await ExpandCostsDetail();
         await Expect(Page.GetByText("SILVER 600", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText("ENGINE_PARTS 300", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText("Engines 1->2")).ToBeVisibleAsync();
@@ -201,6 +243,7 @@ public class PlannerPageTests : PageTest
         await levelEight.ClickAsync();
         await Expect(levelEight).ToHaveAttributeAsync("data-state", "desired");
 
+        await ExpandCostsDetail();
         await Expect(Page.GetByText("Aircraft 7->8")).ToBeVisibleAsync();
     }
 
@@ -221,6 +264,7 @@ public class PlannerPageTests : PageTest
 
         await Expect(levelSix).ToHaveAttributeAsync("data-state", "desired");
         await Expect(levelSeven).ToHaveAttributeAsync("data-state", "desired");
+        await ExpandCostsDetail();
         await Expect(Page.GetByText("Aircraft 5->6")).ToBeVisibleAsync();
         await Expect(Page.GetByText("Aircraft 6->7")).ToBeVisibleAsync();
     }
@@ -260,6 +304,10 @@ public class PlannerPageTests : PageTest
         await MarkMasteryLevelAsDesired(6);
         await MarkGoldMasteryAsPlanned();
 
+        await Expect(Page.GetByTestId("costs-summary").GetByText("269 Gold", new() { Exact = true })).ToBeVisibleAsync();
+        await ExpandCostsDetail();
+        var goldMasteryStep = Page.GetByRole(AriaRole.Row, new() { NameRegex = new Regex("Gold Mastery.*GOLD 269") });
+        await Expect(goldMasteryStep).ToBeVisibleAsync();
         await Expect(Page.GetByText("Mastery Rebate")).ToBeVisibleAsync();
         await Expect(Page.GetByText("AIRCRAFT_PARTS 1,000", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText("Net Grind Needed")).ToBeVisibleAsync();
@@ -285,6 +333,7 @@ public class PlannerPageTests : PageTest
 
         await Expect(levelSix).ToHaveAttributeAsync("data-state", "desired");
         await Expect(levelSeven).ToHaveAttributeAsync("data-state", "desired");
+        await ExpandCostsDetail();
         await Expect(Page.GetByText("Mastery Rebate")).ToBeVisibleAsync();
         await Expect(Page.GetByText("SILVER 900", new() { Exact = true })).ToBeVisibleAsync();
     }
@@ -337,6 +386,7 @@ public class PlannerPageTests : PageTest
         await Expect(aircraftLevelEight).ToHaveAttributeAsync("data-state", "desired");
         await Expect(engineLevelOne).ToHaveAttributeAsync("data-state", "has");
         await Expect(engineLevelTwo).ToHaveAttributeAsync("data-state", "desired");
+        await ExpandCostsDetail();
         await Expect(Page.GetByText("Engines 1->2")).ToBeVisibleAsync();
     }
 
@@ -420,6 +470,7 @@ public class PlannerPageTests : PageTest
         await Expect(aircraftLevels.GetByRole(AriaRole.Button, new() { Name = "8", Exact = true })).ToHaveAttributeAsync("data-state", "desired");
         await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "1", Exact = true })).ToHaveAttributeAsync("data-state", "has");
         await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "2", Exact = true })).ToHaveAttributeAsync("data-state", "desired");
+        await ExpandCostsDetail();
         await Expect(Page.GetByText("Engines 1->2")).ToBeVisibleAsync();
     }
 
@@ -503,6 +554,7 @@ public class PlannerPageTests : PageTest
         await MarkSystemNodeAsDesired(cannons, "6B");
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Warnings" })).ToHaveCountAsync(0);
+        await ExpandCostsDetail();
         await Expect(Page.GetByText("FUSELAGE_PARTS 3,000", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText("CANNON_PARTS 2,100", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText("Fuselage 7->8")).ToBeVisibleAsync();

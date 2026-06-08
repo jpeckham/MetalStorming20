@@ -102,6 +102,46 @@ public class PlannerV2MasteryTests
         Assert.Equal(6300, result.NetGrindNeeded.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
         Assert.Equal(33100, result.NetGrindNeeded.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
     }
+
+    [Fact]
+    public void Plan_PlannedGoldMastery_AddsGoldPurchaseCostToTotalsAndNetGrindNeeded()
+    {
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 5)],
+            OwnedSystemNodes: [],
+            EquippedSystemBranches: [],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 5)],
+            SystemTargets: [],
+            SystemSlots: PlannerV2.GenericSystemSlots,
+            MasteryPlan: new MasteryPlanV2(1, 1, GoldMasteryStatus.Planned)));
+
+        Assert.Empty(result.Warnings);
+        Assert.Equal(269, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.Gold).Amount);
+        Assert.Equal(269, result.NetGrindNeeded.Single(c => c.CurrencyCode == PlannerV2.Currencies.Gold).Amount);
+        var step = Assert.Single(result.Steps);
+        Assert.Equal(PlanStepScope.Mastery, step.Scope);
+        Assert.Equal(269, step.Costs.Single(c => c.CurrencyCode == PlannerV2.Currencies.Gold).Amount);
+    }
+
+    [Fact]
+    public void Plan_OwnedGoldMastery_DoesNotAddGoldPurchaseCost()
+    {
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 5)],
+            OwnedSystemNodes: [],
+            EquippedSystemBranches: [],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 5)],
+            SystemTargets: [],
+            SystemSlots: PlannerV2.GenericSystemSlots,
+            MasteryPlan: new MasteryPlanV2(1, 1, GoldMasteryStatus.Owned)));
+
+        Assert.Empty(result.Warnings);
+        Assert.Empty(result.Steps);
+        Assert.DoesNotContain(result.TotalsRequired, c => c.CurrencyCode == PlannerV2.Currencies.Gold);
+        Assert.DoesNotContain(result.NetGrindNeeded, c => c.CurrencyCode == PlannerV2.Currencies.Gold);
+    }
 }
 
 public class PlannerV2DependencyTests

@@ -9,7 +9,8 @@ public enum BranchOwnershipMode
 public enum PlanStepScope
 {
     Aircraft,
-    System
+    System,
+    Mastery
 }
 
 public enum GoldMasteryStatus
@@ -96,6 +97,7 @@ public static class PlannerV2
 
     public static class Currencies
     {
+        public const string Gold = "GOLD";
         public const string Silver = "SILVER";
         public const string AircraftParts = "AIRCRAFT_PARTS";
         public const string AdvancedParts = "ADVANCED_PARTS";
@@ -192,6 +194,8 @@ public static class PlannerV2
         { 18, (2000, 0) },
         { 22, (0, 5000) }
     };
+
+    private const int GoldMasteryPurchaseCost = 269;
 
     public static IReadOnlyList<UpgradeCostRowV2> AllUpgradeCosts =>
         AircraftCosts.Concat(SystemCosts).ToArray();
@@ -313,6 +317,7 @@ public static class PlannerV2
             }
         }
 
+        AddMasteryPurchaseSteps(steps, request.MasteryPlan);
         var totals = TotalsFor(steps);
         var deficits = DeficitsFor(totals, request.ResourceBalances);
         var masteryRebate = MasteryRebateFor(request.MasteryPlan);
@@ -528,6 +533,22 @@ public static class PlannerV2
         return SortCurrencyAmounts(totals);
     }
 
+    private static void AddMasteryPurchaseSteps(List<PlanStepV2> steps, MasteryPlanV2? masteryPlan)
+    {
+        if (masteryPlan?.GoldStatus != GoldMasteryStatus.Planned)
+        {
+            return;
+        }
+
+        steps.Add(new PlanStepV2(
+            steps.Count + 1,
+            GenericAircraftId,
+            PlanStepScope.Mastery,
+            0,
+            1,
+            [new CurrencyAmountV2(Currencies.Gold, GoldMasteryPurchaseCost)]));
+    }
+
     private static IReadOnlyList<CurrencyAmountV2> DeficitsFor(
         IReadOnlyList<CurrencyAmountV2> totals,
         IReadOnlyList<ResourceBalanceV2> balances)
@@ -617,15 +638,16 @@ public static class PlannerV2
 
     private static int CurrencySort(string currencyCode) => currencyCode switch
     {
-        Currencies.Silver => 0,
-        Currencies.AircraftParts => 1,
-        Currencies.FuselageParts => 2,
-        Currencies.EngineParts => 3,
-        Currencies.AvionicsParts => 4,
-        Currencies.CannonParts => 5,
-        Currencies.MissileParts => 6,
-        Currencies.RocketParts => 7,
-        Currencies.AdvancedParts => 8,
+        Currencies.Gold => 0,
+        Currencies.Silver => 1,
+        Currencies.AircraftParts => 2,
+        Currencies.FuselageParts => 3,
+        Currencies.EngineParts => 4,
+        Currencies.AvionicsParts => 5,
+        Currencies.CannonParts => 6,
+        Currencies.MissileParts => 7,
+        Currencies.RocketParts => 8,
+        Currencies.AdvancedParts => 9,
         _ => 100
     };
 

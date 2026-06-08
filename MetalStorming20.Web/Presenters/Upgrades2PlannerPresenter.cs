@@ -10,6 +10,7 @@ public sealed record Upgrades2PlannerViewModel(
     private static readonly Upgrades2CurrencyFilterViewModel[] CurrencyFilterOptions =
     [
         new("", "All currencies"),
+        new(PlannerV2.Currencies.Gold, PlannerV2.Currencies.Gold),
         new(PlannerV2.Currencies.Silver, PlannerV2.Currencies.Silver),
         new(PlannerV2.Currencies.AircraftParts, PlannerV2.Currencies.AircraftParts),
         new(PlannerV2.Currencies.FuselageParts, PlannerV2.Currencies.FuselageParts),
@@ -84,16 +85,29 @@ public sealed class Upgrades2PlannerPresenter : IUpgrades2PlannerPresenter
         PlanStepV2 step,
         IReadOnlyDictionary<string, string> systemDisplayNames)
     {
-        var groupName = step.SystemSlotId is null
-            ? "Aircraft"
-            : systemDisplayNames.TryGetValue(step.SystemSlotId, out var displayName)
-                ? displayName
-                : step.SystemSlotId;
+        var stepText = StepText(step, systemDisplayNames);
 
         return new Upgrades2PlanStepViewModel(
             step.Order,
-            $"{groupName} {step.FromLevel}->{step.ToLevel}",
+            stepText,
             string.Join(", ", step.Costs.Select(cost => $"{cost.CurrencyCode} {cost.Amount:N0}")),
             step.Costs.Select(cost => cost.CurrencyCode).Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
     }
+
+    private static string StepText(
+        PlanStepV2 step,
+        IReadOnlyDictionary<string, string> systemDisplayNames) =>
+        step.Scope switch
+        {
+            PlanStepScope.Mastery => "Gold Mastery",
+            PlanStepScope.Aircraft => $"Aircraft {step.FromLevel}->{step.ToLevel}",
+            _ => $"{SystemStepDisplayName(step, systemDisplayNames)} {step.FromLevel}->{step.ToLevel}"
+        };
+
+    private static string SystemStepDisplayName(
+        PlanStepV2 step,
+        IReadOnlyDictionary<string, string> systemDisplayNames) =>
+        step.SystemSlotId is not null && systemDisplayNames.TryGetValue(step.SystemSlotId, out var displayName)
+            ? displayName
+            : step.SystemSlotId ?? "System";
 }

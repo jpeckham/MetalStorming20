@@ -1,4 +1,5 @@
 [
+  { "currencyCode": "GOLD", "displayName": "Gold", "sortOrder": 0, "isActive": true },
   { "currencyCode": "SILVER", "displayName": "Silver", "sortOrder": 1, "isActive": true },
   { "currencyCode": "AIRCRAFT_PARTS", "displayName": "Aircraft Parts", "sortOrder": 2, "isActive": true },
   { "currencyCode": "FUSELAGE_PARTS", "displayName": "Fuselage Parts", "sortOrder": 3, "isActive": true },
