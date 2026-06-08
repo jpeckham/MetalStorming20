@@ -297,7 +297,9 @@ public class PlannerPageTests : PageTest
         await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
 
         var aircraftLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Aircraft level nodes" });
+        var masteryLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Mastery level nodes", Exact = true });
         var aircraftLevelEight = aircraftLevels.GetByRole(AriaRole.Button, new() { Name = "8", Exact = true });
+        var masteryLevelOne = masteryLevels.GetByRole(AriaRole.Button, new() { Name = "1", Exact = true });
         var engines = Page.GetByTestId("system-engines");
         var engineLevelOne = engines.GetByRole(AriaRole.Button, new() { Name = "1", Exact = true });
         var engineLevelTwo = engines.GetByRole(AriaRole.Button, new() { Name = "2", Exact = true });
@@ -336,6 +338,59 @@ public class PlannerPageTests : PageTest
         await Expect(engineLevelOne).ToHaveAttributeAsync("data-state", "has");
         await Expect(engineLevelTwo).ToHaveAttributeAsync("data-state", "desired");
         await Expect(Page.GetByText("Engines 1->2")).ToBeVisibleAsync();
+    }
+
+    [TestMethod]
+    public async Task StartNewBuildClearsSelectionsAndPersistedState()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        var aircraftLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Aircraft level nodes" });
+        var masteryLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Mastery level nodes", Exact = true });
+        var aircraftLevelEight = aircraftLevels.GetByRole(AriaRole.Button, new() { Name = "8", Exact = true });
+        var masteryLevelOne = masteryLevels.GetByRole(AriaRole.Button, new() { Name = "1", Exact = true });
+        var engines = Page.GetByTestId("system-engines");
+        var engineLevelOne = engines.GetByRole(AriaRole.Button, new() { Name = "1", Exact = true });
+
+        await aircraftLevelEight.ClickAsync();
+        await aircraftLevelEight.ClickAsync();
+        await engineLevelOne.ClickAsync();
+        await Expect(aircraftLevelEight).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(engineLevelOne).ToHaveAttributeAsync("data-state", "has");
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Start New Build", Exact = true }).ClickAsync();
+
+        await Expect(aircraftLevelEight).ToHaveAttributeAsync("data-state", "off");
+        await Expect(masteryLevelOne).ToHaveAttributeAsync("data-state", "off");
+        await Expect(engineLevelOne).ToHaveAttributeAsync("data-state", "off");
+        await Page.WaitForFunctionAsync(
+            """
+            () => {
+                const state = JSON.parse(localStorage.getItem('metalstorming20.upgrades2.state') || '{}');
+                const engines = state.systemPlans?.find(plan => plan.systemSlotId === 'generic_engines');
+                return state.currentAircraftLevel === 0 &&
+                    state.targetAircraftLevel === 0 &&
+                    state.currentMasteryLevel === 0 &&
+                    state.plannedMasteryLevel === 0 &&
+                    engines &&
+                    Object.keys(engines.nodeStates || {}).length === 0;
+            }
+            """);
+
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        aircraftLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Aircraft level nodes" });
+        masteryLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Mastery level nodes", Exact = true });
+        aircraftLevelEight = aircraftLevels.GetByRole(AriaRole.Button, new() { Name = "8", Exact = true });
+        masteryLevelOne = masteryLevels.GetByRole(AriaRole.Button, new() { Name = "1", Exact = true });
+        engines = Page.GetByTestId("system-engines");
+        engineLevelOne = engines.GetByRole(AriaRole.Button, new() { Name = "1", Exact = true });
+
+        await Expect(aircraftLevelEight).ToHaveAttributeAsync("data-state", "off");
+        await Expect(masteryLevelOne).ToHaveAttributeAsync("data-state", "off");
+        await Expect(engineLevelOne).ToHaveAttributeAsync("data-state", "off");
     }
 
     [TestMethod]

@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $workspace = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $webProject = Join-Path $workspace "MetalStorming20.Web\MetalStorming20.Web.csproj"
 $webOutput = Join-Path $workspace "MetalStorming20.Web\bin\Debug\net8.0\MetalStorming20.Web.dll"
+$debugPorts = @(5193, 7193)
 
 $processes = Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe'" |
     Where-Object {
@@ -12,19 +13,29 @@ $processes = Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe'" |
         }
 
         $commandLine.Contains($webProject, [StringComparison]::OrdinalIgnoreCase) -or
-            $commandLine.Contains($webOutput, [StringComparison]::OrdinalIgnoreCase)
+            $commandLine.Contains($webOutput, [StringComparison]::OrdinalIgnoreCase) -or
+            $commandLine.Contains("MetalStorming20.Web", [StringComparison]::OrdinalIgnoreCase)
     }
 
 $processIds = @($processes | Select-Object -ExpandProperty ProcessId)
+$portOwnerIds = foreach ($port in $debugPorts) {
+    Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+        Where-Object { $_.OwningProcess -gt 0 } |
+        Select-Object -ExpandProperty OwningProcess
+}
 
 $debugHosts = Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe'" |
     Where-Object {
         $commandLine = $_.CommandLine
-        if ([string]::IsNullOrWhiteSpace($commandLine) -or -not $commandLine.Contains("BrowserDebugHost.dll", [StringComparison]::OrdinalIgnoreCase)) {
+        if ([string]::IsNullOrWhiteSpace($commandLine)) {
             return $false
         }
 
-        foreach ($processId in $processIds) {
+        if (-not $commandLine.Contains("BrowserDebugHost.dll", [StringComparison]::OrdinalIgnoreCase)) {
+            return $false
+        }
+
+        foreach ($processId in @($processIds + $portOwnerIds | Sort-Object -Unique)) {
             if ($commandLine -match "--OwnerPid\s+$processId(\s|$)") {
                 return $true
             }
@@ -33,7 +44,7 @@ $debugHosts = Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe'" |
         return $false
     }
 
-$allProcessIds = @($processIds + @($debugHosts | Select-Object -ExpandProperty ProcessId) | Sort-Object -Unique)
+$allProcessIds = @($processIds + $portOwnerIds + @($debugHosts | Select-Object -ExpandProperty ProcessId) | Sort-Object -Unique)
 
 foreach ($processId in $allProcessIds) {
     $process = Get-Process -Id $processId -ErrorAction SilentlyContinue

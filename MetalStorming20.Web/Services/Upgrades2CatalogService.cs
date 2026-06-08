@@ -4,7 +4,7 @@ using MetalStorming20.Core;
 
 namespace MetalStorming20.Web.Services;
 
-public sealed class Upgrades2CatalogService
+public sealed class Upgrades2CatalogService : IUpgrades2CatalogGateway
 {
     private readonly HttpClient httpClient;
     private readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);
@@ -46,6 +46,12 @@ public sealed class Upgrades2CatalogService
                 .ToArray());
 
         return cachedCatalog;
+    }
+
+    public async Task<IReadOnlyList<SystemSlotDefinitionV2>> GetSystemSlotsAsync(CancellationToken cancellationToken = default)
+    {
+        var catalog = await GetCatalogAsync();
+        return catalog.SystemSlots;
     }
 
     private async Task<T> ReadAsync<T>(string url)

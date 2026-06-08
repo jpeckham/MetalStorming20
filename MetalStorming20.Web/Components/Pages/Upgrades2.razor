@@ -1,9 +1,7 @@
 @page "/"
-@using System.Text.Json
-@using MetalStorming20.Core
-@using MetalStorming20.Web.Services
-@inject IJSRuntime JS
-@inject Upgrades2CatalogService CatalogService
+@using MetalStorming20.Web.Controllers
+@using MetalStorming20.Web.Presenters
+@inject Upgrades2Controller Controller
 
 <PageTitle>Upgrades 2.0 Planner</PageTitle>
 
@@ -12,13 +10,17 @@
 <div class="alert alert-info py-2" role="note">
     Green owned nodes are your current state. Blue desired nodes are your target state. Costs are calculated for the gap between owned and desired. If you jump to a branch node such as 7A without an owned path before it, the planner marks the required prior path green automatically.
 </div>
+<div class="d-flex justify-content-end mb-3">
+    <button type="button" class="btn btn-outline-secondary" @onclick="() => Controller.StartNewBuildAsync()">Start New Build</button>
+</div>
 
 <section class="border rounded p-3">
     <h2 class="h5">Aircraft Level</h2>
     <div class="level-grid" role="group" aria-label="Aircraft level nodes">
         @foreach (var level in AircraftLevels)
         {
-            <button type="button" class="@AircraftLevelButtonClass(level)" data-state="@AircraftLevelStateValue(level)" aria-pressed="@aircraftLevelPlan.IsTarget(level).ToString().ToLowerInvariant()" @onclick="() => CycleAircraftLevel(level)">@level</button>
+            var node = Controller.SessionViewModel.AircraftLevels.FirstOrDefault(node => node.Level == level);
+            <button type="button" class="@(node?.CssClass ?? "node-toggle")" data-state="@(node?.State ?? "off")" aria-pressed="@((node?.IsPressed ?? false).ToString().ToLowerInvariant())" @onclick="() => Controller.CycleAircraftLevelAsync(level)">@(node?.Label ?? level.ToString())</button>
         }
     </div>
 </section>
@@ -26,13 +28,14 @@
 <section class="border rounded p-3 mt-3">
     <h2 class="h5">Mastery</h2>
     <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-        <button type="button" class="@GoldMasteryButtonClass()" data-state="@GoldMasteryStateValue()" aria-pressed="@((goldMasteryStatus != GoldMasteryStatus.Off).ToString().ToLowerInvariant())" @onclick="CycleGoldMasteryStatus">Gold</button>
+        <button type="button" class="@Controller.SessionViewModel.GoldCssClass" data-state="@Controller.SessionViewModel.GoldState" aria-pressed="@Controller.SessionViewModel.IsGoldPressed.ToString().ToLowerInvariant()" @onclick="() => Controller.CycleGoldMasteryStatusAsync()">Gold</button>
     </div>
     <div>
         <div class="level-grid" role="group" aria-label="Mastery level nodes">
             @foreach (var level in MasteryLevels)
             {
-                <button type="button" class="@MasteryLevelButtonClass(level)" data-state="@MasteryLevelStateValue(level)" aria-pressed="@masteryLevelPlan.IsTarget(level).ToString().ToLowerInvariant()" @onclick="() => CycleMasteryLevel(level)">@level</button>
+                var node = Controller.SessionViewModel.MasteryLevels.FirstOrDefault(node => node.Level == level);
+                <button type="button" class="@(node?.CssClass ?? "node-toggle")" data-state="@(node?.State ?? "off")" aria-pressed="@((node?.IsPressed ?? false).ToString().ToLowerInvariant())" @onclick="() => Controller.CycleMasteryLevelAsync(level)">@(node?.Label ?? level.ToString())</button>
             }
         </div>
     </div>
@@ -49,21 +52,23 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var row in systemPlans)
+                @foreach (var row in Controller.SessionViewModel.SystemPlans)
                 {
-                    <tr data-testid="@($"system-{Slug(row.DisplayName)}")">
+                    <tr data-testid="@($"system-{row.Slug}")">
                         <th scope="row">@row.DisplayName</th>
                         <td>
                             <div class="node-grid" role="group" aria-label="@($"{row.DisplayName} target nodes")">
-                                <button type="button" class="@NodeButtonClass(row, 1, null)" data-state="@NodeStateValue(row, 1, null)" aria-pressed="@row.IsTarget(1, null).ToString().ToLowerInvariant()" @onclick="() => CycleNode(row, 1, null)">1</button>
-                                <button type="button" class="@NodeButtonClass(row, 2, null)" data-state="@NodeStateValue(row, 2, null)" aria-pressed="@row.IsTarget(2, null).ToString().ToLowerInvariant()" @onclick="() => CycleNode(row, 2, null)">2</button>
-                                <button type="button" class="@NodeButtonClass(row, 3, null)" data-state="@NodeStateValue(row, 3, null)" aria-pressed="@row.IsTarget(3, null).ToString().ToLowerInvariant()" @onclick="() => CycleNode(row, 3, null)">3</button>
-                                <button type="button" class="@NodeButtonClass(row, 4, null)" data-state="@NodeStateValue(row, 4, null)" aria-pressed="@row.IsTarget(4, null).ToString().ToLowerInvariant()" @onclick="() => CycleNode(row, 4, null)">4</button>
-                                @foreach (var level in BranchLevels)
+                                @foreach (var node in row.TrunkNodes)
+                                {
+                                    <button type="button" class="@node.CssClass" data-state="@node.State" aria-pressed="@node.IsPressed.ToString().ToLowerInvariant()" @onclick="() => Controller.CycleNodeAsync(row.SystemSlotId, node.Level, node.BranchCode)">@node.Label</button>
+                                }
+                                @foreach (var stack in row.BranchNodeStacks)
                                 {
                                     <div class="branch-stack">
-                                        <button type="button" class='@NodeButtonClass(row, level, "A")' data-state='@NodeStateValue(row, level, "A")' aria-pressed='@row.IsTarget(level, "A").ToString().ToLowerInvariant()' @onclick='() => CycleNode(row, level, "A")'>@NodeLabel(level, "A")</button>
-                                        <button type="button" class='@NodeButtonClass(row, level, "B")' data-state='@NodeStateValue(row, level, "B")' aria-pressed='@row.IsTarget(level, "B").ToString().ToLowerInvariant()' @onclick='() => CycleNode(row, level, "B")'>@NodeLabel(level, "B")</button>
+                                        @foreach (var node in stack)
+                                        {
+                                            <button type="button" class="@node.CssClass" data-state="@node.State" aria-pressed="@node.IsPressed.ToString().ToLowerInvariant()" @onclick="() => Controller.CycleNodeAsync(row.SystemSlotId, node.Level, node.BranchCode)">@node.Label</button>
+                                        }
                                     </div>
                                 }
                             </div>
@@ -125,17 +130,17 @@
     }
 </style>
 
-@if (result is not null)
+@if (Controller.ViewModel.Result is not null)
 {
     <section class="mt-4">
         <h2>Planner Results</h2>
 
-        @if (result.Warnings.Count > 0)
+        @if (Controller.ViewModel.Result.HasWarnings)
         {
             <div class="alert alert-warning">
                 <h3 class="h6">Warnings</h3>
                 <ul class="mb-0">
-                    @foreach (var warning in result.Warnings)
+                    @foreach (var warning in Controller.ViewModel.Result.Warnings)
                     {
                         <li>@warning</li>
                     }
@@ -147,35 +152,35 @@
             <div class="col-md-6">
                 <div class="border rounded p-3 h-100">
                     <h3 class="h5">Totals Required</h3>
-                    @foreach (var total in result.TotalsRequired)
+                    @foreach (var total in Controller.ViewModel.Result.TotalsRequired)
                     {
-                        <div>@total.CurrencyCode @total.Amount.ToString("N0")</div>
+                        <div>@total.DisplayText</div>
                     }
                 </div>
             </div>
-            @if (result.MasteryRebate.Count > 0)
+            @if (Controller.ViewModel.Result.HasMasteryRebate)
             {
                 <div class="col-md-6">
                     <div class="border rounded p-3 h-100">
                         <h3 class="h5">Mastery Rebate</h3>
-                        @foreach (var rebate in result.MasteryRebate)
+                        @foreach (var rebate in Controller.ViewModel.Result.MasteryRebate)
                         {
-                            <div>@rebate.CurrencyCode @rebate.Amount.ToString("N0")</div>
+                            <div>@rebate.DisplayText</div>
                         }
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="border rounded p-3 h-100" data-testid="net-grind-needed">
                         <h3 class="h5">Net Grind Needed</h3>
-                        @if (result.NetGrindNeeded.Count == 0)
+                        @if (!Controller.ViewModel.Result.HasNetGrindNeeded)
                         {
                             <div>None</div>
                         }
                         else
                         {
-                            @foreach (var net in result.NetGrindNeeded)
+                            @foreach (var net in Controller.ViewModel.Result.NetGrindNeeded)
                             {
-                                <div>@net.CurrencyCode @net.Amount.ToString("N0")</div>
+                                <div>@net.DisplayText</div>
                             }
                         }
                     </div>
@@ -187,10 +192,9 @@
             <div class="col-md-4">
                 <label for="currency-filter" class="form-label">Currency filter</label>
                 <select id="currency-filter" class="form-select" @bind="currencyFilter">
-                    <option value="">All currencies</option>
-                    @foreach (var currency in CurrencyCodes)
+                    @foreach (var filter in Controller.ViewModel.CurrencyFilters)
                     {
-                        <option value="@currency">@currency</option>
+                        <option value="@filter.Value">@filter.Label</option>
                     }
                 </select>
             </div>
@@ -212,8 +216,8 @@
                     {
                         <tr>
                             <td>@step.Order</td>
-                            <td>@DisplayStepGroup(step.SystemSlotId ?? "aircraft") @step.FromLevel-&gt;@step.ToLevel</td>
-                            <td>@string.Join(", ", step.Costs.Select(c => $"{c.CurrencyCode} {c.Amount:N0}"))</td>
+                            <td>@step.StepText</td>
+                            <td>@step.CostsText</td>
                         </tr>
                     }
                 </tbody>
@@ -223,796 +227,30 @@
 }
 
 @code {
-    private const string StorageKey = "metalstorming20.upgrades2.state";
-    private static readonly JsonSerializerOptions LocalStateJsonOptions = new(JsonSerializerDefaults.Web);
-
-    private IReadOnlyList<SystemSlotDefinitionV2> systemSlots = PlannerV2.GenericSystemSlots;
-    private readonly List<SystemPlanRow> systemPlans = [];
-    private readonly AircraftLevelPlan aircraftLevelPlan = AircraftLevelPlan.FromLevels(5, 5);
-    private readonly MasteryLevelPlan masteryLevelPlan = MasteryLevelPlan.FromLevels(1, 1);
-    private GoldMasteryStatus goldMasteryStatus = GoldMasteryStatus.Off;
-
-    private int currentAircraftLevel => aircraftLevelPlan.CurrentAircraftLevel;
-    private int targetAircraftLevel => aircraftLevelPlan.TargetAircraftLevel;
-
-    private PlannerResultV2? result;
     private string currencyFilter = "";
     private bool localStateLoaded;
 
-    private static readonly string[] CurrencyCodes =
-    [
-        PlannerV2.Currencies.Silver,
-        PlannerV2.Currencies.AircraftParts,
-        PlannerV2.Currencies.FuselageParts,
-        PlannerV2.Currencies.EngineParts,
-        PlannerV2.Currencies.AvionicsParts,
-        PlannerV2.Currencies.CannonParts,
-        PlannerV2.Currencies.MissileParts,
-        PlannerV2.Currencies.RocketParts,
-        PlannerV2.Currencies.AdvancedParts
-    ];
-    private static readonly int[] BranchLevels = [5, 6, 7, 8];
     private static readonly int[] AircraftLevels = Enumerable.Range(1, 20).ToArray();
     private static readonly int[] MasteryLevels = Enumerable.Range(1, 24).ToArray();
 
-    private IEnumerable<PlanStepV2> FilteredSteps => result?.Steps
-        .Where(s => string.IsNullOrEmpty(currencyFilter) || s.Costs.Any(c => c.CurrencyCode == currencyFilter))
+    private IEnumerable<Upgrades2PlanStepViewModel> FilteredSteps => Controller.ViewModel.Result?.Steps
+        .Where(s => string.IsNullOrEmpty(currencyFilter) || s.CurrencyCodes.Any(c => c == currencyFilter))
         ?? [];
 
     protected override async Task OnInitializedAsync()
     {
-        var catalog = await CatalogService.GetCatalogAsync();
-        systemSlots = catalog.SystemSlots
-            .Where(s => s.AircraftId == PlannerV2.GenericAircraftId)
-            .DefaultIfEmpty()
-            .Where(s => s is not null)
-            .Cast<SystemSlotDefinitionV2>()
-            .ToArray();
-
-        if (systemSlots.Count == 0)
-        {
-            systemSlots = PlannerV2.GenericSystemSlots;
-        }
-
-        ResetSystemRows();
-        RecalculatePlanner();
+        await Controller.InitializeAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (localStateLoaded || systemPlans.Count == 0)
+        if (localStateLoaded || Controller.SessionViewModel.SystemPlans.Count == 0)
         {
             return;
         }
 
         localStateLoaded = true;
-        var saved = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
-        if (string.IsNullOrWhiteSpace(saved))
-        {
-            return;
-        }
-
-        var state = JsonSerializer.Deserialize<Upgrades2LocalState>(saved, LocalStateJsonOptions);
-        if (state?.SchemaVersion != 2)
-        {
-            return;
-        }
-
-        aircraftLevelPlan.LoadLevels(state.CurrentAircraftLevel, state.TargetAircraftLevel);
-        masteryLevelPlan.LoadLevels(state.CurrentMasteryLevel, state.PlannedMasteryLevel);
-        if (!string.IsNullOrWhiteSpace(state.GoldMasteryStatus) &&
-            Enum.TryParse<GoldMasteryStatus>(state.GoldMasteryStatus, ignoreCase: true, out var parsed))
-        {
-            goldMasteryStatus = parsed;
-        }
-
-        foreach (var savedSystem in state.SystemPlans ?? [])
-        {
-            var row = systemPlans.FirstOrDefault(p => p.SystemSlotId == savedSystem.SystemSlotId);
-            if (row is null)
-            {
-                continue;
-            }
-
-            row.LoadState(savedSystem);
-            row.NormalizeSelection();
-        }
-
-        RecalculatePlanner();
+        await Controller.LoadSavedStateAsync();
         StateHasChanged();
     }
-
-    private void ResetSystemRows()
-    {
-        systemPlans.Clear();
-        systemPlans.AddRange(systemSlots.Select(SystemPlanRow.FromSlot));
-    }
-
-    private void RecalculatePlanner()
-    {
-        NormalizeInputs();
-        result = PlannerV2.Plan(BuildRequest());
-    }
-
-    private async Task RecalculatePlannerAndSave()
-    {
-        RecalculatePlanner();
-        await SaveState();
-    }
-
-    private PlannerRequestV2 BuildRequest()
-    {
-        return new PlannerRequestV2(
-            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, currentAircraftLevel)],
-            OwnedSystemNodes: systemPlans.SelectMany(BuildOwnedNodes).ToArray(),
-            EquippedSystemBranches: systemPlans.SelectMany(BuildEquippedBranches).ToArray(),
-            ResourceBalances: [],
-            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, targetAircraftLevel)],
-            SystemTargets: systemPlans.Select(p => new SystemTargetV2(
-                p.SystemSlotId,
-                p.TargetSystemLevel,
-                p.BranchOwnershipMode,
-                BuildBranchTargets(p),
-                BuildBranchTargetsToOwn(p))).ToArray(),
-            SystemSlots: systemSlots,
-            MasteryPlan: BuildMasteryPlan());
-    }
-
-    private MasteryPlanV2 BuildMasteryPlan() =>
-        new(
-            masteryLevelPlan.CurrentMasteryLevel,
-            masteryLevelPlan.PlannedMasteryLevel,
-            goldMasteryStatus);
-
-    private static IReadOnlyDictionary<int, string>? BuildBranchTargets(SystemPlanRow row)
-    {
-        return row.TargetSystemLevel >= 5
-            ? Enumerable.Range(5, row.TargetSystemLevel - 4).ToDictionary(level => level, level => row.SelectedBranchFor(level) ?? "A")
-            : null;
-    }
-
-    private static IReadOnlyDictionary<int, IReadOnlyList<string>>? BuildBranchTargetsToOwn(SystemPlanRow row)
-    {
-        if (row.TargetSystemLevel < 5)
-        {
-            return null;
-        }
-
-        return Enumerable.Range(5, row.TargetSystemLevel - 4)
-            .Select(level => new
-            {
-                Level = level,
-                Branches = new[] { "A", "B" }
-                    .Where(branch => row.IsTarget(level, branch))
-                    .ToArray()
-            })
-            .Where(target => target.Branches.Length > 0)
-            .ToDictionary(
-                target => target.Level,
-                target => (IReadOnlyList<string>)target.Branches);
-    }
-
-    private static IEnumerable<OwnedSystemNodeV2> BuildOwnedNodes(SystemPlanRow row) =>
-        row.HasNodes.Select(node => new OwnedSystemNodeV2(row.SystemSlotId, SystemPlanRow.ParseLevel(node), SystemPlanRow.ParseBranch(node)));
-
-    private static IEnumerable<EquippedSystemBranchV2> BuildEquippedBranches(SystemPlanRow row) =>
-        row.HasNodes
-            .Select(node => new { Level = SystemPlanRow.ParseLevel(node), Branch = SystemPlanRow.ParseBranch(node) })
-            .Where(node => node.Level >= 5 && node.Branch is not null)
-            .GroupBy(node => node.Level)
-            .Select(group => group.OrderBy(node => node.Branch, StringComparer.OrdinalIgnoreCase).First())
-            .Select(node => new EquippedSystemBranchV2(row.SystemSlotId, node.Level, node.Branch!));
-
-    private async Task SaveState()
-    {
-        var state = new Upgrades2LocalState(
-            2,
-            currentAircraftLevel,
-            targetAircraftLevel,
-            systemPlans.Select(SystemPlanState.FromRow).ToArray(),
-            masteryLevelPlan.CurrentMasteryLevel,
-            masteryLevelPlan.PlannedMasteryLevel,
-            goldMasteryStatus.ToString());
-
-        await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, JsonSerializer.Serialize(state, LocalStateJsonOptions));
-    }
-
-    private void NormalizeInputs()
-    {
-        aircraftLevelPlan.NormalizeSelection();
-        masteryLevelPlan.NormalizeSelection();
-
-        foreach (var row in systemPlans)
-        {
-            row.NormalizeSelection();
-        }
-    }
-
-    private string DisplayStepGroup(string id) => id == "aircraft"
-        ? "Aircraft"
-        : systemPlans.FirstOrDefault(s => s.SystemSlotId == id)?.DisplayName ?? id;
-
-    private static string Slug(string value) =>
-        value.ToLowerInvariant()
-            .Replace("/", "-", StringComparison.Ordinal)
-            .Replace(" ", "-", StringComparison.Ordinal);
-
-    private static string NodeButtonClass(SystemPlanRow row, int level, string? branchCode) =>
-        row.StateFor(level, branchCode) switch
-        {
-            NodeToggleState.Desired => "node-toggle desired",
-            NodeToggleState.Has => "node-toggle has",
-            _ => "node-toggle"
-        };
-
-    private static string NodeStateValue(SystemPlanRow row, int level, string? branchCode) =>
-        row.StateFor(level, branchCode) switch
-        {
-            NodeToggleState.Desired => "desired",
-            NodeToggleState.Has => "has",
-            _ => "off"
-        };
-
-    private string AircraftLevelButtonClass(int level) =>
-        aircraftLevelPlan.StateFor(level) switch
-        {
-            NodeToggleState.Desired => "node-toggle desired",
-            NodeToggleState.Has => "node-toggle has",
-            _ => "node-toggle"
-        };
-
-    private string AircraftLevelStateValue(int level) =>
-        aircraftLevelPlan.StateFor(level) switch
-        {
-            NodeToggleState.Desired => "desired",
-            NodeToggleState.Has => "has",
-            _ => "off"
-        };
-
-    private string MasteryLevelButtonClass(int level) =>
-        masteryLevelPlan.StateFor(level) switch
-        {
-            NodeToggleState.Desired => "node-toggle desired",
-            NodeToggleState.Has => "node-toggle has",
-            _ => "node-toggle"
-        };
-
-    private string MasteryLevelStateValue(int level) =>
-        masteryLevelPlan.StateFor(level) switch
-        {
-            NodeToggleState.Desired => "desired",
-            NodeToggleState.Has => "has",
-            _ => "off"
-        };
-
-    private string GoldMasteryButtonClass() =>
-        goldMasteryStatus switch
-        {
-            GoldMasteryStatus.Planned => "node-toggle gold-toggle desired",
-            GoldMasteryStatus.Owned => "node-toggle gold-toggle has",
-            _ => "node-toggle gold-toggle"
-        };
-
-    private string GoldMasteryStateValue() =>
-        goldMasteryStatus switch
-        {
-            GoldMasteryStatus.Planned => "desired",
-            GoldMasteryStatus.Owned => "has",
-            _ => "off"
-        };
-
-    private async Task CycleAircraftLevel(int level)
-    {
-        aircraftLevelPlan.Cycle(level);
-        await RecalculatePlannerAndSave();
-    }
-
-    private async Task CycleMasteryLevel(int level)
-    {
-        masteryLevelPlan.Cycle(level);
-        await RecalculatePlannerAndSave();
-    }
-
-    private async Task CycleGoldMasteryStatus()
-    {
-        goldMasteryStatus = goldMasteryStatus switch
-        {
-            GoldMasteryStatus.Off => GoldMasteryStatus.Owned,
-            GoldMasteryStatus.Owned => GoldMasteryStatus.Planned,
-            _ => GoldMasteryStatus.Off
-        };
-
-        await RecalculatePlannerAndSave();
-    }
-
-    private async Task CycleNode(SystemPlanRow row, int level, string? branchCode)
-    {
-        row.Cycle(level, branchCode);
-        await RecalculatePlannerAndSave();
-    }
-
-    private static string NodeLabel(int level, string branchCode) => $"{level}{branchCode}";
-
-    private enum NodeToggleState
-    {
-        Off,
-        Desired,
-        Has
-    }
-
-    private sealed class AircraftLevelPlan
-    {
-        public Dictionary<int, NodeToggleState> LevelStates { get; } = [];
-
-        public int CurrentAircraftLevel
-        {
-            get
-            {
-                var hasLevels = LevelStates
-                    .Where(level => level.Value == NodeToggleState.Has)
-                    .Select(level => level.Key)
-                    .ToArray();
-
-                return hasLevels.Length == 0 ? 1 : hasLevels.Max();
-            }
-        }
-
-        public int TargetAircraftLevel
-        {
-            get
-            {
-                var targetLevels = LevelStates
-                    .Where(level => level.Value is NodeToggleState.Desired or NodeToggleState.Has)
-                    .Select(level => level.Key)
-                    .ToArray();
-
-                return targetLevels.Length == 0 ? 1 : targetLevels.Max();
-            }
-        }
-
-        public static AircraftLevelPlan FromLevels(int currentLevel, int targetLevel)
-        {
-            var plan = new AircraftLevelPlan();
-            plan.LoadLevels(currentLevel, targetLevel);
-            return plan;
-        }
-
-        public bool IsTarget(int level) => StateFor(level) is NodeToggleState.Desired or NodeToggleState.Has;
-
-        public NodeToggleState StateFor(int level) =>
-            LevelStates.TryGetValue(level, out var state) ? state : NodeToggleState.Off;
-
-        public void Cycle(int level)
-        {
-            level = Math.Clamp(level, 1, 20);
-            var nextState = StateFor(level) switch
-            {
-                NodeToggleState.Off when HasDesiredPrerequisite(level) => NodeToggleState.Desired,
-                NodeToggleState.Off => NodeToggleState.Has,
-                NodeToggleState.Has => NodeToggleState.Desired,
-                _ => NodeToggleState.Off
-            };
-
-            if (nextState == NodeToggleState.Off)
-            {
-                LevelStates.Remove(level);
-            }
-            else
-            {
-                LevelStates[level] = nextState;
-            }
-
-            NormalizeSelection();
-        }
-
-        public void LoadLevels(int currentLevel, int targetLevel)
-        {
-            LevelStates.Clear();
-
-            currentLevel = Math.Clamp(currentLevel, 1, 20);
-            targetLevel = Math.Clamp(targetLevel, currentLevel, 20);
-
-            for (var level = 1; level <= currentLevel; level++)
-            {
-                LevelStates[level] = NodeToggleState.Has;
-            }
-
-            for (var level = currentLevel + 1; level <= targetLevel; level++)
-            {
-                LevelStates[level] = NodeToggleState.Desired;
-            }
-        }
-
-        public void NormalizeSelection()
-        {
-            var targetLevel = TargetAircraftLevel;
-            var currentLevel = CurrentAircraftLevel;
-
-            if (targetLevel < currentLevel)
-            {
-                targetLevel = currentLevel;
-            }
-
-            for (var level = 1; level <= currentLevel; level++)
-            {
-                LevelStates[level] = NodeToggleState.Has;
-            }
-
-            for (var level = currentLevel + 1; level <= targetLevel; level++)
-            {
-                if (StateFor(level) == NodeToggleState.Off)
-                {
-                    LevelStates[level] = NodeToggleState.Desired;
-                }
-            }
-
-            foreach (var level in LevelStates.Keys.Where(level => level > targetLevel).ToArray())
-            {
-                LevelStates.Remove(level);
-            }
-        }
-
-        private bool HasDesiredPrerequisite(int level)
-        {
-            for (var prerequisiteLevel = 1; prerequisiteLevel < level; prerequisiteLevel++)
-            {
-                if (StateFor(prerequisiteLevel) == NodeToggleState.Desired)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-    }
-
-    private sealed class MasteryLevelPlan
-    {
-        public Dictionary<int, NodeToggleState> LevelStates { get; } = [];
-
-        public int CurrentMasteryLevel
-        {
-            get
-            {
-                var hasLevels = LevelStates
-                    .Where(level => level.Value == NodeToggleState.Has)
-                    .Select(level => level.Key)
-                    .ToArray();
-
-                return hasLevels.Length == 0 ? 1 : hasLevels.Max();
-            }
-        }
-
-        public int PlannedMasteryLevel
-        {
-            get
-            {
-                var targetLevels = LevelStates
-                    .Where(level => level.Value is NodeToggleState.Desired or NodeToggleState.Has)
-                    .Select(level => level.Key)
-                    .ToArray();
-
-                return targetLevels.Length == 0 ? 1 : targetLevels.Max();
-            }
-        }
-
-        public static MasteryLevelPlan FromLevels(int currentLevel, int plannedLevel)
-        {
-            var plan = new MasteryLevelPlan();
-            plan.LoadLevels(currentLevel, plannedLevel);
-            return plan;
-        }
-
-        public bool IsTarget(int level) => StateFor(level) is NodeToggleState.Desired or NodeToggleState.Has;
-
-        public NodeToggleState StateFor(int level) =>
-            LevelStates.TryGetValue(level, out var state) ? state : NodeToggleState.Off;
-
-        public void Cycle(int level)
-        {
-            level = Math.Clamp(level, 1, 24);
-            var nextState = StateFor(level) switch
-            {
-                NodeToggleState.Off when HasDesiredPrerequisite(level) => NodeToggleState.Desired,
-                NodeToggleState.Off => NodeToggleState.Has,
-                NodeToggleState.Has => NodeToggleState.Desired,
-                _ => NodeToggleState.Off
-            };
-
-            if (nextState == NodeToggleState.Off)
-            {
-                LevelStates.Remove(level);
-            }
-            else
-            {
-                LevelStates[level] = nextState;
-            }
-
-            NormalizeSelection();
-        }
-
-        public void LoadLevels(int currentLevel, int plannedLevel)
-        {
-            LevelStates.Clear();
-
-            currentLevel = Math.Clamp(currentLevel, 1, 24);
-            plannedLevel = Math.Clamp(plannedLevel, currentLevel, 24);
-
-            for (var level = 1; level <= currentLevel; level++)
-            {
-                LevelStates[level] = NodeToggleState.Has;
-            }
-
-            for (var level = currentLevel + 1; level <= plannedLevel; level++)
-            {
-                LevelStates[level] = NodeToggleState.Desired;
-            }
-        }
-
-        public void NormalizeSelection()
-        {
-            var plannedLevel = PlannedMasteryLevel;
-            var currentLevel = CurrentMasteryLevel;
-
-            if (plannedLevel < currentLevel)
-            {
-                plannedLevel = currentLevel;
-            }
-
-            for (var level = 1; level <= currentLevel; level++)
-            {
-                LevelStates[level] = NodeToggleState.Has;
-            }
-
-            for (var level = currentLevel + 1; level <= plannedLevel; level++)
-            {
-                if (StateFor(level) == NodeToggleState.Off)
-                {
-                    LevelStates[level] = NodeToggleState.Desired;
-                }
-            }
-
-            foreach (var level in LevelStates.Keys.Where(level => level > plannedLevel).ToArray())
-            {
-                LevelStates.Remove(level);
-            }
-        }
-
-        private bool HasDesiredPrerequisite(int level)
-        {
-            for (var prerequisiteLevel = 1; prerequisiteLevel < level; prerequisiteLevel++)
-            {
-                if (StateFor(prerequisiteLevel) == NodeToggleState.Desired)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-    }
-
-    private sealed class SystemPlanRow
-    {
-        public string Id { get; } = Guid.NewGuid().ToString("N");
-        public string SystemSlotId { get; set; } = "";
-        public string DisplayName { get; set; } = "";
-        public Dictionary<string, NodeToggleState> NodeStates { get; } = new(StringComparer.OrdinalIgnoreCase);
-        public IReadOnlyList<string> TargetNodes => NodeStates
-            .Where(node => node.Value is NodeToggleState.Desired or NodeToggleState.Has)
-            .Select(node => node.Key)
-            .ToArray();
-        public IReadOnlyList<string> HasNodes => NodeStates
-            .Where(node => node.Value == NodeToggleState.Has)
-            .Select(node => node.Key)
-            .ToArray();
-
-        public int TargetSystemLevel
-        {
-            get
-            {
-                var selectedLevels = TargetNodes.Select(ParseLevel).Where(level => level > 0).ToArray();
-                return selectedLevels.Length == 0 ? 0 : selectedLevels.Max();
-            }
-        }
-
-        public BranchOwnershipMode BranchOwnershipMode =>
-            BranchLevels.Any(level => IsTarget(level, "A") && IsTarget(level, "B"))
-                ? BranchOwnershipMode.Both
-                : BranchOwnershipMode.ChosenOnly;
-
-        public static SystemPlanRow FromSlot(SystemSlotDefinitionV2 slot) =>
-            new()
-            {
-                SystemSlotId = slot.SystemSlotId,
-                DisplayName = slot.DisplayName
-            };
-
-        public bool IsTarget(int level, string? branchCode) => StateFor(level, branchCode) is NodeToggleState.Desired or NodeToggleState.Has;
-
-        public NodeToggleState StateFor(int level, string? branchCode) => StateFor(NodeKey(level, branchCode));
-
-        public NodeToggleState StateFor(string nodeKey) =>
-            NodeStates.TryGetValue(nodeKey, out var state) ? state : NodeToggleState.Off;
-
-        public void Cycle(int level, string? branchCode)
-        {
-            var key = NodeKey(level, branchCode);
-            var nextState = StateFor(key) switch
-            {
-                NodeToggleState.Off => NodeToggleState.Has,
-                NodeToggleState.Has => NodeToggleState.Desired,
-                _ => NodeToggleState.Off
-            };
-
-            if (nextState == NodeToggleState.Off)
-            {
-                NodeStates.Remove(key);
-            }
-            else
-            {
-                NodeStates[key] = nextState;
-            }
-
-            if (level >= 5 &&
-                nextState is NodeToggleState.Has or NodeToggleState.Desired &&
-                !HasSelectedPrerequisitePath(level))
-            {
-                MarkPrerequisitePathAsOwned(level, branchCode);
-            }
-
-            NormalizeSelection();
-        }
-
-        public string? SelectedBranchFor(int level)
-        {
-            if (IsTarget(level, "A"))
-            {
-                return "A";
-            }
-
-            return IsTarget(level, "B") ? "B" : null;
-        }
-
-        public void NormalizeSelection()
-        {
-            var maxLevel = TargetSystemLevel;
-            for (var level = 1; level <= Math.Min(maxLevel, 4); level++)
-            {
-                EnsureAtLeastDesired(level, null);
-            }
-
-            if (maxLevel >= 5)
-            {
-                for (var level = 5; level <= maxLevel; level++)
-                {
-                    if (!IsTarget(level, "A") && !IsTarget(level, "B"))
-                    {
-                        EnsureAtLeastDesired(level, "A");
-                    }
-                }
-            }
-        }
-
-        public void LoadState(SystemPlanState savedSystem)
-        {
-            NodeStates.Clear();
-
-            foreach (var node in savedSystem.SelectedNodes ?? [])
-            {
-                NodeStates[node] = NodeToggleState.Desired;
-            }
-
-            if (savedSystem.NodeStates is null)
-            {
-                return;
-            }
-
-            foreach (var node in savedSystem.NodeStates)
-            {
-                NodeStates[node.Key] = node.Value.Equals("has", StringComparison.OrdinalIgnoreCase)
-                    ? NodeToggleState.Has
-                    : NodeToggleState.Desired;
-            }
-        }
-
-        private void EnsureAtLeastDesired(int level, string? branchCode)
-        {
-            var key = NodeKey(level, branchCode);
-            if (StateFor(key) == NodeToggleState.Off)
-            {
-                NodeStates[key] = NodeToggleState.Desired;
-            }
-        }
-
-        private bool HasSelectedPrerequisitePath(int level)
-        {
-            if (level <= 1)
-            {
-                return true;
-            }
-
-            for (var trunkLevel = 1; trunkLevel <= Math.Min(level - 1, 4); trunkLevel++)
-            {
-                if (!IsTarget(trunkLevel, null))
-                {
-                    return false;
-                }
-            }
-
-            if (level <= 5)
-            {
-                return true;
-            }
-
-            for (var branchLevel = 5; branchLevel < level; branchLevel++)
-            {
-                if (!IsTarget(branchLevel, "A") && !IsTarget(branchLevel, "B"))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private void MarkPrerequisitePathAsOwned(int level, string? branchCode)
-        {
-            for (var trunkLevel = 1; trunkLevel <= Math.Min(level - 1, 4); trunkLevel++)
-            {
-                NodeStates[NodeKey(trunkLevel, null)] = NodeToggleState.Has;
-            }
-
-            if (level <= 5)
-            {
-                return;
-            }
-
-            var branch = branchCode ?? "A";
-            for (var branchLevel = 5; branchLevel < level; branchLevel++)
-            {
-                if (StateFor(branchLevel, "A") != NodeToggleState.Has &&
-                    StateFor(branchLevel, "B") != NodeToggleState.Has)
-                {
-                    NodeStates[NodeKey(branchLevel, branch)] = NodeToggleState.Has;
-                }
-            }
-        }
-
-        private static string NodeKey(int level, string? branchCode) =>
-            branchCode is null ? level.ToString() : $"{level}{branchCode}";
-
-        public static int ParseLevel(string key) =>
-            int.TryParse(key[..1], out var level) ? level : 0;
-
-        public static string? ParseBranch(string key) =>
-            key.Length > 1 ? key[1..].ToUpperInvariant() : null;
-    }
-
-    private sealed record SystemPlanState(
-        string SystemSlotId,
-        IReadOnlyList<string>? SelectedNodes,
-        IReadOnlyDictionary<string, string>? NodeStates)
-    {
-        public static SystemPlanState FromRow(SystemPlanRow row) =>
-            new(
-                row.SystemSlotId,
-                row.TargetNodes.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
-                row.NodeStates
-                    .Where(node => node.Value is NodeToggleState.Desired or NodeToggleState.Has)
-                    .OrderBy(node => node.Key, StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(
-                        node => node.Key,
-                        node => node.Value == NodeToggleState.Has ? "has" : "desired",
-                        StringComparer.OrdinalIgnoreCase));
-    }
-
-    private sealed record Upgrades2LocalState(
-        int SchemaVersion,
-        int CurrentAircraftLevel,
-        int TargetAircraftLevel,
-        IReadOnlyList<SystemPlanState>? SystemPlans,
-        int CurrentMasteryLevel,
-        int PlannedMasteryLevel,
-        string? GoldMasteryStatus);
 }

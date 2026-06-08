@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MetalStorming20.Core\MetalStorming20.Core.csproj" />
+    <ProjectReference Include="..\MetalStorming20.Web\MetalStorming20.Web.csproj" />
   </ItemGroup>
 
 </Project>
