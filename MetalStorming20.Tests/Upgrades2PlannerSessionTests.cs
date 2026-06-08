@@ -144,4 +144,149 @@ public class Upgrades2PlannerSessionTests
         Assert.Equal(GoldMasteryStatus.Off, session.GoldMasteryStatus);
         Assert.Empty(session.SystemPlans.Single().NodeStates);
     }
+
+    [Fact]
+    public void LoadBuildCollection_LoadsSelectedBuildState()
+    {
+        var session = new Upgrades2PlannerSession();
+        session.ResetSystemRows([
+            new SystemSlotDefinitionV2(
+                "generic_engines",
+                PlannerV2.GenericAircraftId,
+                "ENGINES",
+                PlannerV2.Currencies.EngineParts,
+                "Engines")
+        ]);
+        var selectedState = new Upgrades2PlannerState(
+            2,
+            7,
+            8,
+            [
+                new Upgrades2SavedSystemPlan(
+                    "generic_engines",
+                    ["1"],
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["1"] = "has"
+                    })
+            ],
+            2,
+            4,
+            GoldMasteryStatus.Owned.ToString());
+
+        session.LoadBuildCollection(new Upgrades2SavedBuildCollection(
+            "build-2",
+            [
+                new Upgrades2SavedBuild("build-1", "First", session.BuildState()),
+                new Upgrades2SavedBuild("build-2", "Second", selectedState)
+            ]));
+
+        Assert.Equal("build-2", session.SelectedBuildId);
+        Assert.Equal("Second", session.SelectedBuildName);
+        Assert.Equal(7, session.CurrentAircraftLevel);
+        Assert.Equal(8, session.TargetAircraftLevel);
+        Assert.Equal(Upgrades2NodeSelectionState.Owned, session.SystemPlans.Single().StateFor(1, null));
+    }
+
+    [Fact]
+    public void CreateNewBuild_AddsBlankSelectedBuildWithoutRemovingExistingBuild()
+    {
+        var session = new Upgrades2PlannerSession();
+        session.ResetSystemRows([
+            new SystemSlotDefinitionV2(
+                "generic_engines",
+                PlannerV2.GenericAircraftId,
+                "ENGINES",
+                PlannerV2.Currencies.EngineParts,
+                "Engines")
+        ]);
+        session.LoadBuildCollection(new Upgrades2SavedBuildCollection(
+            "build-1",
+            [
+                new Upgrades2SavedBuild("build-1", "First", session.BuildState())
+            ]));
+
+        session.CreateNewBuild();
+
+        Assert.Equal(2, session.SavedBuilds.Count);
+        Assert.Equal("unnamed", session.SelectedBuildName);
+        Assert.Equal(0, session.CurrentAircraftLevel);
+        Assert.Equal(0, session.TargetAircraftLevel);
+        Assert.Empty(session.SystemPlans.Single().NodeStates);
+    }
+
+    [Fact]
+    public void RenameSelectedBuild_NormalizesBlankNameToUnnamed()
+    {
+        var session = new Upgrades2PlannerSession();
+        session.ResetSystemRows([
+            new SystemSlotDefinitionV2(
+                "generic_engines",
+                PlannerV2.GenericAircraftId,
+                "ENGINES",
+                PlannerV2.Currencies.EngineParts,
+                "Engines")
+        ]);
+        session.EnsureSelectedBuild();
+
+        session.RenameSelectedBuild("   ");
+
+        Assert.Equal("unnamed", session.SelectedBuildName);
+    }
+
+    [Fact]
+    public void DeleteSelectedBuild_SelectsNextBuild()
+    {
+        var session = new Upgrades2PlannerSession();
+        session.ResetSystemRows([
+            new SystemSlotDefinitionV2(
+                "generic_engines",
+                PlannerV2.GenericAircraftId,
+                "ENGINES",
+                PlannerV2.Currencies.EngineParts,
+                "Engines")
+        ]);
+        var firstState = session.BuildState();
+        var secondState = firstState with { CurrentAircraftLevel = 9, TargetAircraftLevel = 10 };
+        session.LoadBuildCollection(new Upgrades2SavedBuildCollection(
+            "build-1",
+            [
+                new Upgrades2SavedBuild("build-1", "First", firstState),
+                new Upgrades2SavedBuild("build-2", "Second", secondState)
+            ]));
+
+        session.DeleteSelectedBuild();
+
+        Assert.Equal("build-2", session.SelectedBuildId);
+        Assert.Equal("Second", session.SelectedBuildName);
+        Assert.Equal(9, session.CurrentAircraftLevel);
+        Assert.Equal(10, session.TargetAircraftLevel);
+    }
+
+    [Fact]
+    public void DeleteSelectedBuild_WhenLastBuildCreatesBlankUnnamedBuild()
+    {
+        var session = new Upgrades2PlannerSession();
+        session.ResetSystemRows([
+            new SystemSlotDefinitionV2(
+                "generic_engines",
+                PlannerV2.GenericAircraftId,
+                "ENGINES",
+                PlannerV2.Currencies.EngineParts,
+                "Engines")
+        ]);
+        session.LoadBuildCollection(new Upgrades2SavedBuildCollection(
+            "build-1",
+            [
+                new Upgrades2SavedBuild("build-1", "Only", session.BuildState())
+            ]));
+
+        session.DeleteSelectedBuild();
+
+        var build = Assert.Single(session.SavedBuilds);
+        Assert.Equal("unnamed", build.Name);
+        Assert.Equal(build.Id, session.SelectedBuildId);
+        Assert.Equal(0, session.CurrentAircraftLevel);
+        Assert.Equal(0, session.TargetAircraftLevel);
+    }
 }

@@ -20,6 +20,7 @@ public class Upgrades2PlannerSessionViewUseCaseTests
         session.CycleAircraftLevel(6);
         session.CycleGoldMasteryStatus();
         session.SystemPlans.Single().Cycle(1, null);
+        session.EnsureSelectedBuild();
         var presenter = new RecordingSessionPresenter();
         var useCase = new PresentUpgrades2PlannerSessionUseCase();
 
@@ -34,6 +35,39 @@ public class Upgrades2PlannerSessionViewUseCaseTests
         Assert.Equal("generic_engines", system.SystemSlotId);
         Assert.Equal("Engines", system.DisplayName);
         Assert.Equal(Upgrades2NodeSelectionState.Owned, system.Nodes.Single(node => node.Level == 1 && node.BranchCode is null).State);
+        var build = Assert.Single(response.Builds);
+        Assert.Equal(response.SelectedBuildId, build.Id);
+        Assert.Equal("unnamed", response.SelectedBuildName);
+    }
+
+    [Fact]
+    public void Handle_PresentsSavedBuildOptions()
+    {
+        var session = new Upgrades2PlannerSession();
+        session.ResetSystemRows([
+            new SystemSlotDefinitionV2(
+                "generic_engines",
+                PlannerV2.GenericAircraftId,
+                "ENGINES",
+                PlannerV2.Currencies.EngineParts,
+                "Engines")
+        ]);
+        var firstState = session.BuildState();
+        session.LoadBuildCollection(new Upgrades2SavedBuildCollection(
+            "build-2",
+            [
+                new Upgrades2SavedBuild("build-1", "Alpha", firstState),
+                new Upgrades2SavedBuild("build-2", "Bravo", firstState with { CurrentAircraftLevel = 7, TargetAircraftLevel = 8 })
+            ]));
+        var presenter = new RecordingSessionPresenter();
+        var useCase = new PresentUpgrades2PlannerSessionUseCase();
+
+        useCase.Handle(session, presenter);
+
+        var response = Assert.Single(presenter.Responses);
+        Assert.Equal("build-2", response.SelectedBuildId);
+        Assert.Equal("Bravo", response.SelectedBuildName);
+        Assert.Equal(["Alpha", "Bravo"], response.Builds.Select(build => build.Name));
     }
 
     [Fact]

@@ -374,10 +374,14 @@ public class PlannerPageTests : PageTest
         await Page.WaitForFunctionAsync(
             """
             () => {
-                const state = JSON.parse(localStorage.getItem('metalstorming20.upgrades2.state') || '{}');
-                const engines = state.systemPlans?.find(plan => plan.systemSlotId === 'generic_engines');
-                return state.currentAircraftLevel === 7 &&
-                    state.targetAircraftLevel === 8 &&
+                const collection = JSON.parse(localStorage.getItem('metalstorming20.upgrades2.builds') || '{}');
+                const build = collection.builds?.find(build => build.id === collection.selectedBuildId);
+                const state = build?.state;
+                const engines = state?.systemPlans?.find(plan => plan.systemSlotId === 'generic_engines');
+                return collection.builds?.length === 1 &&
+                    build?.name === 'unnamed' &&
+                    state?.currentAircraftLevel === 7 &&
+                    state?.targetAircraftLevel === 8 &&
                     engines?.nodeStates?.['1'] === 'has' &&
                     engines?.nodeStates?.['2'] === 'desired';
             }
@@ -399,7 +403,7 @@ public class PlannerPageTests : PageTest
     }
 
     [TestMethod]
-    public async Task StartNewBuildClearsSelectionsAndPersistedState()
+    public async Task NewBuildCreatesBlankSelectedBuildAndKeepsPreviousBuild()
     {
         await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
         await Page.EvaluateAsync("localStorage.clear()");
@@ -418,7 +422,7 @@ public class PlannerPageTests : PageTest
         await Expect(aircraftLevelEight).ToHaveAttributeAsync("data-state", "desired");
         await Expect(engineLevelOne).ToHaveAttributeAsync("data-state", "has");
 
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Start New Build", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "New Build", Exact = true }).ClickAsync();
 
         await Expect(aircraftLevelEight).ToHaveAttributeAsync("data-state", "off");
         await Expect(masteryLevelOne).ToHaveAttributeAsync("data-state", "off");
@@ -426,14 +430,22 @@ public class PlannerPageTests : PageTest
         await Page.WaitForFunctionAsync(
             """
             () => {
-                const state = JSON.parse(localStorage.getItem('metalstorming20.upgrades2.state') || '{}');
-                const engines = state.systemPlans?.find(plan => plan.systemSlotId === 'generic_engines');
-                return state.currentAircraftLevel === 0 &&
-                    state.targetAircraftLevel === 0 &&
-                    state.currentMasteryLevel === 0 &&
-                    state.plannedMasteryLevel === 0 &&
-                    engines &&
-                    Object.keys(engines.nodeStates || {}).length === 0;
+                const collection = JSON.parse(localStorage.getItem('metalstorming20.upgrades2.builds') || '{}');
+                const selectedBuild = collection.builds?.find(build => build.id === collection.selectedBuildId);
+                const previousBuild = collection.builds?.find(build => build.id !== collection.selectedBuildId);
+                const selectedEngines = selectedBuild?.state?.systemPlans?.find(plan => plan.systemSlotId === 'generic_engines');
+                const previousEngines = previousBuild?.state?.systemPlans?.find(plan => plan.systemSlotId === 'generic_engines');
+                return collection.builds?.length === 2 &&
+                    selectedBuild?.name === 'unnamed' &&
+                    selectedBuild?.state?.currentAircraftLevel === 0 &&
+                    selectedBuild?.state?.targetAircraftLevel === 0 &&
+                    selectedBuild?.state?.currentMasteryLevel === 0 &&
+                    selectedBuild?.state?.plannedMasteryLevel === 0 &&
+                    selectedEngines &&
+                    Object.keys(selectedEngines.nodeStates || {}).length === 0 &&
+                    previousBuild?.state?.currentAircraftLevel === 7 &&
+                    previousBuild?.state?.targetAircraftLevel === 8 &&
+                    previousEngines?.nodeStates?.['1'] === 'has';
             }
             """);
 
@@ -449,6 +461,48 @@ public class PlannerPageTests : PageTest
         await Expect(aircraftLevelEight).ToHaveAttributeAsync("data-state", "off");
         await Expect(masteryLevelOne).ToHaveAttributeAsync("data-state", "off");
         await Expect(engineLevelOne).ToHaveAttributeAsync("data-state", "off");
+    }
+
+    [TestMethod]
+    public async Task DeleteBuildRequiresConfirmationAndSelectsRemainingBuild()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        var aircraftLevels = Page.GetByRole(AriaRole.Group, new() { Name = "Aircraft level nodes" });
+        var aircraftLevelEight = aircraftLevels.GetByRole(AriaRole.Button, new() { Name = "8", Exact = true });
+        var engines = Page.GetByTestId("system-engines");
+        var engineLevelOne = engines.GetByRole(AriaRole.Button, new() { Name = "1", Exact = true });
+
+        await aircraftLevelEight.ClickAsync();
+        await aircraftLevelEight.ClickAsync();
+        await engineLevelOne.ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "New Build", Exact = true }).ClickAsync();
+
+        var confirmations = new Queue<bool>([false, true]);
+        Page.Dialog += async (_, dialog) =>
+        {
+            Assert.AreEqual("Delete this build? This cannot be undone.", dialog.Message);
+            if (confirmations.Dequeue())
+            {
+                await dialog.AcceptAsync();
+            }
+            else
+            {
+                await dialog.DismissAsync();
+            }
+        };
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Delete Build", Exact = true }).ClickAsync();
+        await Expect(Page.GetByLabel("Build", new() { Exact = true }).Locator("option")).ToHaveCountAsync(2);
+        await Expect(engineLevelOne).ToHaveAttributeAsync("data-state", "off");
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Delete Build", Exact = true }).ClickAsync();
+
+        await Expect(Page.GetByLabel("Build", new() { Exact = true }).Locator("option")).ToHaveCountAsync(1);
+        await Expect(aircraftLevelEight).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(engineLevelOne).ToHaveAttributeAsync("data-state", "has");
     }
 
     [TestMethod]

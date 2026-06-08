@@ -34,6 +34,15 @@ public sealed class Upgrades2Controller
     public Task StartNewBuildAsync(CancellationToken cancellationToken = default) =>
         sessionInteractor.StartNewBuildAsync(Session, plannerPresenter, sessionPresenter, cancellationToken);
 
+    public Task SelectBuildAsync(string buildId, CancellationToken cancellationToken = default) =>
+        sessionInteractor.SelectBuildAsync(Session, buildId, plannerPresenter, sessionPresenter, cancellationToken);
+
+    public Task RenameSelectedBuildAsync(string? name, CancellationToken cancellationToken = default) =>
+        sessionInteractor.RenameSelectedBuildAsync(Session, name, plannerPresenter, sessionPresenter, cancellationToken);
+
+    public Task DeleteSelectedBuildAsync(CancellationToken cancellationToken = default) =>
+        sessionInteractor.DeleteSelectedBuildAsync(Session, plannerPresenter, sessionPresenter, cancellationToken);
+
     public Task CycleAircraftLevelAsync(int level, CancellationToken cancellationToken = default) =>
         sessionInteractor.CycleAircraftLevelAsync(Session, level, plannerPresenter, sessionPresenter, cancellationToken);
 

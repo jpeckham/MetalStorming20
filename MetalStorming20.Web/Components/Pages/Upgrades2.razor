@@ -3,6 +3,7 @@
 @using MetalStorming20.Web.Controllers
 @using MetalStorming20.Web.Presenters
 @inject Upgrades2Controller Controller
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Upgrades 2.0 Planner</PageTitle>
 
@@ -11,8 +12,28 @@
 <div class="alert alert-info py-2" role="note">
     Green owned nodes are your current state. Blue desired nodes are your target state. Costs are calculated for the gap between owned and desired. If you jump to a branch node such as 7A without an owned path before it, the planner marks the required prior path green automatically.
 </div>
-<div class="d-flex justify-content-end mb-3">
-    <button type="button" class="btn btn-outline-secondary" @onclick="() => Controller.StartNewBuildAsync()">Start New Build</button>
+<div class="build-toolbar border rounded p-3 mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label for="build-selector" class="form-label">Build</label>
+            <select id="build-selector" class="form-select" value="@Controller.SessionViewModel.SelectedBuildId" @onchange="SelectBuildAsync">
+                @foreach (var build in Controller.SessionViewModel.Builds)
+                {
+                    <option value="@build.Id">@build.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label for="build-name" class="form-label">Build name</label>
+            <input id="build-name" class="form-control" value="@Controller.SessionViewModel.SelectedBuildName" @onchange="RenameSelectedBuildAsync" />
+        </div>
+        <div class="col-md-4">
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => Controller.StartNewBuildAsync()">New Build</button>
+                <button type="button" class="btn btn-outline-danger" @onclick="DeleteSelectedBuildAsync">Delete Build</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 @if (Controller.ViewModel.Result is not null)
@@ -395,5 +416,30 @@
         localStateLoaded = true;
         await Controller.LoadSavedStateAsync();
         StateHasChanged();
+    }
+
+    private async Task SelectBuildAsync(ChangeEventArgs args)
+    {
+        var buildId = args.Value?.ToString();
+        if (!string.IsNullOrWhiteSpace(buildId))
+        {
+            await Controller.SelectBuildAsync(buildId);
+        }
+    }
+
+    private async Task RenameSelectedBuildAsync(ChangeEventArgs args)
+    {
+        await Controller.RenameSelectedBuildAsync(args.Value?.ToString());
+    }
+
+    private async Task DeleteSelectedBuildAsync()
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>(
+            "confirm",
+            "Delete this build? This cannot be undone.");
+        if (confirmed)
+        {
+            await Controller.DeleteSelectedBuildAsync();
+        }
     }
 }

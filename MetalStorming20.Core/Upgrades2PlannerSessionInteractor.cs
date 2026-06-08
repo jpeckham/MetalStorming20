@@ -22,6 +22,7 @@ public sealed class Upgrades2PlannerSessionInteractor
     {
         var systemSlots = await GetGenericSystemSlotsAsync(cancellationToken);
         session.ResetSystemRows(systemSlots);
+        session.EnsureSelectedBuild();
         PresentPlanner(session, plannerPresenter);
         PresentSession(session, sessionPresenter);
     }
@@ -37,13 +38,8 @@ public sealed class Upgrades2PlannerSessionInteractor
             return;
         }
 
-        var state = await stateGateway.LoadAsync(cancellationToken);
-        if (state is null)
-        {
-            return;
-        }
-
-        session.LoadState(state);
+        var collection = await stateGateway.LoadBuildCollectionAsync(cancellationToken);
+        session.LoadBuildCollection(collection);
         PresentPlanner(session, plannerPresenter);
         PresentSession(session, sessionPresenter);
     }
@@ -105,7 +101,39 @@ public sealed class Upgrades2PlannerSessionInteractor
         IUpgrades2PlannerSessionPresenter sessionPresenter,
         CancellationToken cancellationToken = default)
     {
-        session.ResetSelections();
+        session.CreateNewBuild();
+        return RecalculateSaveAndPresentAsync(session, plannerPresenter, sessionPresenter, cancellationToken);
+    }
+
+    public Task SelectBuildAsync(
+        Upgrades2PlannerSession session,
+        string buildId,
+        IUpgrades2PlannerPresenter plannerPresenter,
+        IUpgrades2PlannerSessionPresenter sessionPresenter,
+        CancellationToken cancellationToken = default)
+    {
+        session.SelectBuild(buildId);
+        return RecalculateSaveAndPresentAsync(session, plannerPresenter, sessionPresenter, cancellationToken);
+    }
+
+    public Task RenameSelectedBuildAsync(
+        Upgrades2PlannerSession session,
+        string? name,
+        IUpgrades2PlannerPresenter plannerPresenter,
+        IUpgrades2PlannerSessionPresenter sessionPresenter,
+        CancellationToken cancellationToken = default)
+    {
+        session.RenameSelectedBuild(name);
+        return SaveAndPresentSessionAsync(session, sessionPresenter, cancellationToken);
+    }
+
+    public Task DeleteSelectedBuildAsync(
+        Upgrades2PlannerSession session,
+        IUpgrades2PlannerPresenter plannerPresenter,
+        IUpgrades2PlannerSessionPresenter sessionPresenter,
+        CancellationToken cancellationToken = default)
+    {
+        session.DeleteSelectedBuild();
         return RecalculateSaveAndPresentAsync(session, plannerPresenter, sessionPresenter, cancellationToken);
     }
 
@@ -125,7 +153,16 @@ public sealed class Upgrades2PlannerSessionInteractor
         CancellationToken cancellationToken)
     {
         PresentPlanner(session, plannerPresenter);
-        await stateGateway.SaveAsync(session.BuildState(), cancellationToken);
+        await stateGateway.SaveBuildCollectionAsync(session.BuildBuildCollection(), cancellationToken);
+        PresentSession(session, sessionPresenter);
+    }
+
+    private async Task SaveAndPresentSessionAsync(
+        Upgrades2PlannerSession session,
+        IUpgrades2PlannerSessionPresenter sessionPresenter,
+        CancellationToken cancellationToken)
+    {
+        await stateGateway.SaveBuildCollectionAsync(session.BuildBuildCollection(), cancellationToken);
         PresentSession(session, sessionPresenter);
     }
 

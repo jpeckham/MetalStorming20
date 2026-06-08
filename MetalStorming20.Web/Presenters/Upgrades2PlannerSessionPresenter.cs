@@ -24,15 +24,21 @@ public sealed record Upgrades2SystemPlanRowViewModel(
     IReadOnlyList<Upgrades2SystemNodeViewModel> TrunkNodes,
     IReadOnlyList<IReadOnlyList<Upgrades2SystemNodeViewModel>> BranchNodeStacks);
 
+public sealed record Upgrades2SavedBuildViewModel(string Id, string Name);
+
 public sealed record Upgrades2PlannerSessionViewModel(
     IReadOnlyList<Upgrades2LevelNodeViewModel> AircraftLevels,
     IReadOnlyList<Upgrades2LevelNodeViewModel> MasteryLevels,
     string GoldCssClass,
     string GoldState,
     bool IsGoldPressed,
-    IReadOnlyList<Upgrades2SystemPlanRowViewModel> SystemPlans)
+    IReadOnlyList<Upgrades2SystemPlanRowViewModel> SystemPlans,
+    string? SelectedBuildId,
+    string SelectedBuildName,
+    IReadOnlyList<Upgrades2SavedBuildViewModel> Builds)
 {
-    public static Upgrades2PlannerSessionViewModel Empty { get; } = new([], [], "node-toggle gold-toggle", "off", false, []);
+    public static Upgrades2PlannerSessionViewModel Empty { get; } =
+        new([], [], "node-toggle gold-toggle", "off", false, [], null, "unnamed", []);
 }
 
 public sealed class Upgrades2PlannerSessionPresenter : IUpgrades2PlannerSessionPresenter
@@ -47,7 +53,10 @@ public sealed class Upgrades2PlannerSessionPresenter : IUpgrades2PlannerSessionP
             GoldCssClass(response.GoldMasteryStatus),
             NodeState(response.GoldMasteryStatus),
             response.GoldMasteryStatus != GoldMasteryStatus.Off,
-            response.Systems.Select(ToSystemPlanViewModel).ToArray());
+            response.Systems.Select(ToSystemPlanViewModel).ToArray(),
+            response.SelectedBuildId,
+            response.SelectedBuildName,
+            response.Builds.Select(build => new Upgrades2SavedBuildViewModel(build.Id, build.Name)).ToArray());
     }
 
     private static Upgrades2LevelNodeViewModel ToLevelViewModel(Upgrades2LevelSelectionResponse level) =>

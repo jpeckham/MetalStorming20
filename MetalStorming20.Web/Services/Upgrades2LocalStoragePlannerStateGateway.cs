@@ -7,6 +7,7 @@ namespace MetalStorming20.Web.Services;
 public sealed class Upgrades2LocalStoragePlannerStateGateway : IUpgrades2PlannerStateGateway
 {
     private const string StorageKey = "metalstorming20.upgrades2.state";
+    private const string BuildCollectionStorageKey = "metalstorming20.upgrades2.builds";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IJSRuntime jsRuntime;
 
@@ -27,5 +28,38 @@ public sealed class Upgrades2LocalStoragePlannerStateGateway : IUpgrades2Planner
     {
         var json = JsonSerializer.Serialize(state, JsonOptions);
         await jsRuntime.InvokeVoidAsync("localStorage.setItem", cancellationToken, StorageKey, json);
+    }
+
+    public async Task<Upgrades2SavedBuildCollection?> LoadBuildCollectionAsync(CancellationToken cancellationToken = default)
+    {
+        var saved = await jsRuntime.InvokeAsync<string?>(
+            "localStorage.getItem",
+            cancellationToken,
+            BuildCollectionStorageKey);
+        if (!string.IsNullOrWhiteSpace(saved))
+        {
+            return JsonSerializer.Deserialize<Upgrades2SavedBuildCollection>(saved, JsonOptions);
+        }
+
+        var legacyState = await LoadAsync(cancellationToken);
+        if (legacyState is null)
+        {
+            return null;
+        }
+
+        var migratedBuildId = Guid.NewGuid().ToString("N");
+        return new Upgrades2SavedBuildCollection(
+            migratedBuildId,
+            [
+                new Upgrades2SavedBuild(migratedBuildId, "unnamed", legacyState)
+            ]);
+    }
+
+    public async Task SaveBuildCollectionAsync(
+        Upgrades2SavedBuildCollection collection,
+        CancellationToken cancellationToken = default)
+    {
+        var json = JsonSerializer.Serialize(collection, JsonOptions);
+        await jsRuntime.InvokeVoidAsync("localStorage.setItem", cancellationToken, BuildCollectionStorageKey, json);
     }
 }

@@ -5,6 +5,21 @@ namespace MetalStorming20.Tests;
 public class Upgrades2PlannerUseCaseTests
 {
     [Fact]
+    public void BuildPlannerRequest_WhenAircraftLevelsAreClearedOmitsAircraftTarget()
+    {
+        var request = Upgrades2PlannerUseCase.BuildPlannerRequest(
+            new Upgrades2PlannerInput(
+                0,
+                0,
+                [],
+                null),
+            PlannerV2.GenericSystemSlots);
+
+        Assert.Empty(request.Aircraft);
+        Assert.Empty(request.AircraftTargets);
+    }
+
+    [Fact]
     public async Task HandleAsync_LoadsCatalogThroughGatewayAndPresentsPlannerResponse()
     {
         var gateway = new RecordingCatalogGateway([

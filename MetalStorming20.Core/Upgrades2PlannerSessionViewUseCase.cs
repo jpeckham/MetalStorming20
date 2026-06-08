@@ -12,13 +12,18 @@ public sealed record Upgrades2SystemPlanResponse(
     string DisplayName,
     IReadOnlyList<Upgrades2SystemNodeSelectionResponse> Nodes);
 
+public sealed record Upgrades2SavedBuildResponse(string Id, string Name);
+
 public sealed record Upgrades2PlannerSessionResponse(
     IReadOnlyList<Upgrades2LevelSelectionResponse> AircraftLevels,
     IReadOnlyList<Upgrades2LevelSelectionResponse> MasteryLevels,
     GoldMasteryStatus GoldMasteryStatus,
     IReadOnlyList<Upgrades2SystemPlanResponse> Systems,
     int CurrentAircraftLevel,
-    int TargetAircraftLevel);
+    int TargetAircraftLevel,
+    string? SelectedBuildId,
+    string SelectedBuildName,
+    IReadOnlyList<Upgrades2SavedBuildResponse> Builds);
 
 public interface IUpgrades2PlannerSessionPresenter
 {
@@ -41,7 +46,12 @@ public sealed class PresentUpgrades2PlannerSessionUseCase
             GoldMasteryStatus: session.GoldMasteryStatus,
             Systems: session.SystemPlans.Select(BuildSystemResponse).ToArray(),
             CurrentAircraftLevel: session.CurrentAircraftLevel,
-            TargetAircraftLevel: session.TargetAircraftLevel));
+            TargetAircraftLevel: session.TargetAircraftLevel,
+            SelectedBuildId: session.SelectedBuildId,
+            SelectedBuildName: session.SelectedBuildName,
+            Builds: session.SavedBuilds
+                .Select(build => new Upgrades2SavedBuildResponse(build.Id, build.Name))
+                .ToArray()));
     }
 
     private static Upgrades2SystemPlanResponse BuildSystemResponse(Upgrades2SystemPlanRow row)

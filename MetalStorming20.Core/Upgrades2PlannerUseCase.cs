@@ -86,12 +86,18 @@ public sealed class Upgrades2PlannerUseCase
             }
         }
 
+        var hasAircraftSelection = input.TargetAircraftLevel > 0;
+
         return new PlannerRequestV2(
-            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, input.CurrentAircraftLevel)],
+            Aircraft: hasAircraftSelection
+                ? [new AircraftStateV2(PlannerV2.GenericAircraftId, true, Math.Max(1, input.CurrentAircraftLevel))]
+                : [],
             OwnedSystemNodes: ownedNodes,
             EquippedSystemBranches: equippedBranches,
             ResourceBalances: [],
-            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, input.TargetAircraftLevel)],
+            AircraftTargets: hasAircraftSelection
+                ? [new AircraftTargetV2(PlannerV2.GenericAircraftId, input.TargetAircraftLevel)]
+                : [],
             SystemTargets: systemTargets,
             SystemSlots: systemSlots,
             MasteryPlan: input.MasteryPlan);
