@@ -4,5 +4,7 @@
   { "systemTypeId": "AVIONICS", "displayName": "Avionics", "currencyCode": "AVIONICS_PARTS", "isCoreSystem": true, "allowsDuplicateSlots": false },
   { "systemTypeId": "CANNONS", "displayName": "Cannons", "currencyCode": "CANNON_PARTS", "isCoreSystem": false, "allowsDuplicateSlots": true },
   { "systemTypeId": "MISSILE", "displayName": "Missile", "currencyCode": "MISSILE_PARTS", "isCoreSystem": false, "allowsDuplicateSlots": true },
-  { "systemTypeId": "ROCKETS", "displayName": "Rockets", "currencyCode": "ROCKET_PARTS", "isCoreSystem": false, "allowsDuplicateSlots": true }
+  { "systemTypeId": "ROCKETS", "displayName": "Rockets", "currencyCode": "ROCKET_PARTS", "isCoreSystem": false, "allowsDuplicateSlots": true },
+  { "systemTypeId": "SPECIAL", "displayName": "Special", "currencyCode": "SPECIAL_ABILITY_BLUEPRINT", "isCoreSystem": false, "allowsDuplicateSlots": false },
+  { "systemTypeId": "PASSIVE", "displayName": "Passive", "currencyCode": "PASSIVE_ABILITY_BLUEPRINT", "isCoreSystem": false, "allowsDuplicateSlots": false }
 ]

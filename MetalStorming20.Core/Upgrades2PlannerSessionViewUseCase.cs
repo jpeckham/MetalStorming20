@@ -47,12 +47,13 @@ public sealed class PresentUpgrades2PlannerSessionUseCase
     private static Upgrades2SystemPlanResponse BuildSystemResponse(Upgrades2SystemPlanRow row)
     {
         var nodes = new List<Upgrades2SystemNodeSelectionResponse>();
-        for (var level = 1; level <= 4; level++)
+        var trunkMaxLevel = row.UsesBranches ? Math.Min(row.MaxSystemLevel, 4) : row.MaxSystemLevel;
+        for (var level = 1; level <= trunkMaxLevel; level++)
         {
             nodes.Add(new Upgrades2SystemNodeSelectionResponse(level, null, row.StateFor(level, null)));
         }
 
-        foreach (var level in BranchLevels)
+        foreach (var level in BranchLevels.Where(level => row.UsesBranches && level <= row.MaxSystemLevel))
         {
             nodes.Add(new Upgrades2SystemNodeSelectionResponse(level, "A", row.StateFor(level, "A")));
             nodes.Add(new Upgrades2SystemNodeSelectionResponse(level, "B", row.StateFor(level, "B")));

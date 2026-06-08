@@ -286,12 +286,36 @@
         background: #2f80ed;
     }
 
-    .currency-icon.system-parts {
+    .currency-icon.fuselage-parts {
+        background: #2f80ed;
+    }
+
+    .currency-icon.engine-parts {
+        background: #8b5cf6;
+    }
+
+    .currency-icon.avionics-parts {
         background: #20a464;
     }
 
+    .currency-icon.cannon-parts {
+        background: #f4c430;
+    }
+
+    .currency-icon.missile-parts {
+        background: #f97316;
+    }
+
+    .currency-icon.rocket-parts {
+        background: #7a8794;
+    }
+
     .currency-icon.advanced-parts {
-        background: #b05cd6;
+        background: #b87333;
+    }
+
+    .currency-icon.ability-blueprints {
+        background: #e0564f;
     }
 
     .cost-details > summary {
@@ -327,12 +351,14 @@
             PlannerV2.Currencies.Silver => "Silver",
             PlannerV2.Currencies.AircraftParts => "Aircraft Parts",
             PlannerV2.Currencies.AdvancedParts => "Advanced Parts",
-            PlannerV2.Currencies.FuselageParts or
-            PlannerV2.Currencies.EngineParts or
-            PlannerV2.Currencies.AvionicsParts or
-            PlannerV2.Currencies.CannonParts or
-            PlannerV2.Currencies.MissileParts or
-            PlannerV2.Currencies.RocketParts => "System Parts",
+            PlannerV2.Currencies.SpecialAbilityBlueprints => "Special Ability Blueprints",
+            PlannerV2.Currencies.PassiveAbilityBlueprints => "Passive Ability Blueprints",
+            PlannerV2.Currencies.FuselageParts => "Fuselage Parts",
+            PlannerV2.Currencies.EngineParts => "Engine Parts",
+            PlannerV2.Currencies.AvionicsParts => "Avionics Parts",
+            PlannerV2.Currencies.CannonParts => "Cannon Parts",
+            PlannerV2.Currencies.MissileParts => "Missile Parts",
+            PlannerV2.Currencies.RocketParts => "Rocket Parts",
             _ => currencyCode.Replace("_", " ", StringComparison.OrdinalIgnoreCase)
         };
 
@@ -343,12 +369,14 @@
             PlannerV2.Currencies.Silver => "currency-icon silver",
             PlannerV2.Currencies.AircraftParts => "currency-icon aircraft-parts",
             PlannerV2.Currencies.AdvancedParts => "currency-icon advanced-parts",
-            PlannerV2.Currencies.FuselageParts or
-            PlannerV2.Currencies.EngineParts or
-            PlannerV2.Currencies.AvionicsParts or
-            PlannerV2.Currencies.CannonParts or
-            PlannerV2.Currencies.MissileParts or
-            PlannerV2.Currencies.RocketParts => "currency-icon system-parts",
+            PlannerV2.Currencies.SpecialAbilityBlueprints or
+            PlannerV2.Currencies.PassiveAbilityBlueprints => "currency-icon ability-blueprints",
+            PlannerV2.Currencies.FuselageParts => "currency-icon fuselage-parts",
+            PlannerV2.Currencies.EngineParts => "currency-icon engine-parts",
+            PlannerV2.Currencies.AvionicsParts => "currency-icon avionics-parts",
+            PlannerV2.Currencies.CannonParts => "currency-icon cannon-parts",
+            PlannerV2.Currencies.MissileParts => "currency-icon missile-parts",
+            PlannerV2.Currencies.RocketParts => "currency-icon rocket-parts",
             _ => "currency-icon"
         };
 

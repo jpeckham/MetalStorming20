@@ -143,7 +143,9 @@ public class PlannerPageTests : PageTest
         await Expect(summary.GetByText("Costs Summary", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(summary.GetByText("2,900 Silver", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(summary.GetByText("225 Aircraft Parts", new() { Exact = true })).ToBeVisibleAsync();
-        await Expect(summary.GetByText("950 System Parts", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(summary.GetByText("950 Engine Parts", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(summary.Locator(".currency-icon.engine-parts")).ToBeVisibleAsync();
+        await Expect(summary.Locator(".currency-icon.system-parts")).ToHaveCountAsync(0);
 
         var summaryBox = await summary.BoundingBoxAsync();
         var aircraftLevelBox = await Page.GetByRole(AriaRole.Heading, new() { Name = "Aircraft Level" }).BoundingBoxAsync();
@@ -170,6 +172,12 @@ public class PlannerPageTests : PageTest
         await Expect(Page.GetByRole(AriaRole.Rowheader, new() { Name = "Main/Radar Missile" })).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Rowheader, new() { Name = "Secondary/IR Missile" })).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Rowheader, new() { Name = "Rockets" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Rowheader, new() { Name = "Special" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Rowheader, new() { Name = "Passive" })).ToBeVisibleAsync();
+        await Expect(Page.GetByTestId("system-special").GetByRole(AriaRole.Button, new() { Name = "3", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByTestId("system-special").GetByRole(AriaRole.Button, new() { Name = "4", Exact = true })).ToHaveCountAsync(0);
+        await Expect(Page.GetByTestId("system-passive").GetByRole(AriaRole.Button, new() { Name = "5", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByTestId("system-passive").GetByRole(AriaRole.Button, new() { Name = "5A", Exact = true })).ToHaveCountAsync(0);
 
         await MarkAircraftLevelAsHas(6);
         await MarkSystemNodeAsDesired(Page.GetByTestId("system-cannons"), "1");

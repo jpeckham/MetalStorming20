@@ -61,7 +61,10 @@ public sealed record SystemSlotDefinitionV2(
     string SystemTypeId,
     string PartCurrencyCode,
     string DisplayName,
-    int UnlockAircraftLevel = 6);
+    int UnlockAircraftLevel = 6,
+    int MaxSystemLevel = 8,
+    bool UsesBranches = true,
+    string UpgradeKind = "SYSTEM");
 
 public sealed record PlannerRequestV2(
     IReadOnlyList<AircraftStateV2> Aircraft,
@@ -107,6 +110,8 @@ public static class PlannerV2
         public const string CannonParts = "CANNON_PARTS";
         public const string MissileParts = "MISSILE_PARTS";
         public const string RocketParts = "ROCKET_PARTS";
+        public const string SpecialAbilityBlueprints = "SPECIAL_ABILITY_BLUEPRINT";
+        public const string PassiveAbilityBlueprints = "PASSIVE_ABILITY_BLUEPRINT";
     }
 
     public static IReadOnlyList<SystemSlotDefinitionV2> DefaultSystemSlots { get; } =
@@ -132,7 +137,9 @@ public static class PlannerV2
         new("generic_cannons", GenericAircraftId, "CANNONS", Currencies.CannonParts, "Cannons"),
         new("generic_main_radar_missile", GenericAircraftId, "MISSILE", Currencies.MissileParts, "Main/Radar Missile"),
         new("generic_secondary_ir_missile", GenericAircraftId, "MISSILE", Currencies.MissileParts, "Secondary/IR Missile"),
-        new("generic_rockets", GenericAircraftId, "ROCKETS", Currencies.RocketParts, "Rockets")
+        new("generic_rockets", GenericAircraftId, "ROCKETS", Currencies.RocketParts, "Rockets"),
+        new("generic_special", GenericAircraftId, "SPECIAL", Currencies.SpecialAbilityBlueprints, "Special", 8, 3, false, "SPECIAL"),
+        new("generic_passive", GenericAircraftId, "PASSIVE", Currencies.PassiveAbilityBlueprints, "Passive", 12, 5, false, "PASSIVE")
     ];
 
     private static readonly UpgradeCostRowV2[] AircraftCosts =
@@ -170,6 +177,22 @@ public static class PlannerV2
         SystemRow(7, 8, 7000, 3000, 1, "MEDIUM_HIGH")
     ];
 
+    private static readonly UpgradeCostRowV2[] SpecialCosts =
+    [
+        AbilityRow("SPECIAL", 0, 1, 5000, 1),
+        AbilityRow("SPECIAL", 1, 2, 10000, 2),
+        AbilityRow("SPECIAL", 2, 3, 20000, 5)
+    ];
+
+    private static readonly UpgradeCostRowV2[] PassiveCosts =
+    [
+        AbilityRow("PASSIVE", 0, 1, 3000, 1),
+        AbilityRow("PASSIVE", 1, 2, 6000, 2),
+        AbilityRow("PASSIVE", 2, 3, 12000, 3),
+        AbilityRow("PASSIVE", 3, 4, 21000, 5),
+        AbilityRow("PASSIVE", 4, 5, 33000, 8)
+    ];
+
     private static readonly Dictionary<int, (int aircraftParts, int silver)> MasteryNonGoldRewards = new()
     {
         { 1,  (100, 0) },
@@ -198,13 +221,16 @@ public static class PlannerV2
     private const int GoldMasteryPurchaseCost = 269;
 
     public static IReadOnlyList<UpgradeCostRowV2> AllUpgradeCosts =>
-        AircraftCosts.Concat(SystemCosts).ToArray();
+        AircraftCosts.Concat(SystemCosts).Concat(SpecialCosts).Concat(PassiveCosts).ToArray();
 
     public static UpgradeCostRowV2 GetAircraftUpgradeCost(int fromLevel, int toLevel) =>
         AircraftCosts.Single(c => c.FromLevel == fromLevel && c.ToLevel == toLevel);
 
     public static UpgradeCostRowV2 GetSystemUpgradeCost(int fromLevel, int toLevel) =>
         SystemCosts.Single(c => c.FromLevel == fromLevel && c.ToLevel == toLevel);
+
+    public static UpgradeCostRowV2 GetAbilityUpgradeCost(string upgradeKind, int fromLevel, int toLevel) =>
+        AbilityCosts(upgradeKind).Single(c => c.FromLevel == fromLevel && c.ToLevel == toLevel);
 
     public static IReadOnlyDictionary<string, int> SumAircraftCosts(int fromLevel, int toLevel)
     {
@@ -231,6 +257,22 @@ public static class PlannerV2
             Add(totals, Currencies.Silver, cost.SilverCost * multiplier);
             Add(totals, systemPartCurrencyCode, cost.SystemPartsCost * multiplier);
             Add(totals, Currencies.AdvancedParts, cost.AdvancedPartsCost * multiplier);
+        }
+
+        return totals;
+    }
+
+    public static IReadOnlyDictionary<string, int> SumAbilityCosts(
+        string upgradeKind,
+        int fromLevel,
+        int toLevel,
+        string blueprintCurrencyCode)
+    {
+        var totals = new Dictionary<string, int>();
+        foreach (var cost in AbilityCosts(upgradeKind).Where(c => c.FromLevel >= fromLevel && c.ToLevel <= toLevel))
+        {
+            Add(totals, Currencies.Silver, cost.SilverCost);
+            Add(totals, blueprintCurrencyCode, cost.SystemPartsCost);
         }
 
         return totals;
@@ -290,7 +332,7 @@ public static class PlannerV2
                 for (var level = 0; level < systemTarget.TargetSystemLevel; level++)
                 {
                     var toLevel = level + 1;
-                    var branchCodes = BranchCodesToPurchase(systemTarget, toLevel);
+                    var branchCodes = BranchCodesToPurchase(systemTarget, slot, toLevel);
                     foreach (var branchCode in branchCodes)
                     {
                         if (IsOwned(request.OwnedSystemNodes, systemTarget.SystemSlotId, toLevel, branchCode))
@@ -298,7 +340,7 @@ public static class PlannerV2
                             continue;
                         }
 
-                        var cost = GetSystemUpgradeCost(level, toLevel);
+                        var cost = GetSlotUpgradeCost(slot, level, toLevel);
                         steps.Add(new PlanStepV2(
                             steps.Count + 1,
                             slot.AircraftId,
@@ -373,9 +415,9 @@ public static class PlannerV2
                 warnings.Add($"{target.SystemSlotId} targets an unowned aircraft.");
             }
 
-            if (target.TargetSystemLevel < 0 || target.TargetSystemLevel > 8)
+            if (target.TargetSystemLevel < 0 || target.TargetSystemLevel > slot.MaxSystemLevel)
             {
-                warnings.Add($"{target.SystemSlotId} target system level must be between 0 and 8.");
+                warnings.Add($"{target.SystemSlotId} target system level must be between 0 and {slot.MaxSystemLevel}.");
             }
 
             var currentSystemLevel = CurrentSystemLevel(request.OwnedSystemNodes, target.SystemSlotId);
@@ -384,7 +426,7 @@ public static class PlannerV2
                 warnings.Add($"{target.SystemSlotId} target system level cannot be below current owned level.");
             }
 
-            if (target.OwnershipMode == BranchOwnershipMode.ChosenOnly && target.TargetSystemLevel >= 5)
+            if (slot.UsesBranches && target.OwnershipMode == BranchOwnershipMode.ChosenOnly && target.TargetSystemLevel >= 5)
             {
                 for (var level = 5; level <= target.TargetSystemLevel; level++)
                 {
@@ -401,7 +443,11 @@ public static class PlannerV2
             {
                 foreach (var equipped in target.TargetEquippedBranches)
                 {
-                    if (equipped.Key < 5)
+                    if (!slot.UsesBranches)
+                    {
+                        warnings.Add($"{target.SystemSlotId} does not support branch choices.");
+                    }
+                    else if (equipped.Key < 5)
                     {
                         warnings.Add($"{target.SystemSlotId} cannot equip a branch below system level 5.");
                     }
@@ -421,7 +467,11 @@ public static class PlannerV2
 
         foreach (var equipped in request.EquippedSystemBranches)
         {
-            if (equipped.SystemLevel < 5)
+            if (slotsById.TryGetValue(equipped.SystemSlotId, out var slot) && !slot.UsesBranches)
+            {
+                warnings.Add($"{equipped.SystemSlotId} does not support branch choices.");
+            }
+            else if (equipped.SystemLevel < 5)
             {
                 warnings.Add($"{equipped.SystemSlotId} cannot equip a branch below system level 5.");
             }
@@ -437,6 +487,11 @@ public static class PlannerV2
 
         foreach (var slotGroup in request.OwnedSystemNodes.GroupBy(n => n.SystemSlotId, StringComparer.OrdinalIgnoreCase))
         {
+            if (!slotsById.TryGetValue(slotGroup.Key, out var slot) || !slot.UsesBranches)
+            {
+                continue;
+            }
+
             var nodes = slotGroup.ToArray();
             for (var trunkLevel = 1; trunkLevel <= Math.Min(4, nodes.Select(n => n.SystemLevel).DefaultIfEmpty(0).Max()); trunkLevel++)
             {
@@ -472,9 +527,9 @@ public static class PlannerV2
         return warnings.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    private static string?[] BranchCodesToPurchase(SystemTargetV2 target, int toLevel)
+    private static string?[] BranchCodesToPurchase(SystemTargetV2 target, SystemSlotDefinitionV2 slot, int toLevel)
     {
-        if (toLevel < 5)
+        if (!slot.UsesBranches || toLevel < 5)
         {
             return [null];
         }
@@ -647,7 +702,9 @@ public static class PlannerV2
         Currencies.CannonParts => 6,
         Currencies.MissileParts => 7,
         Currencies.RocketParts => 8,
-        Currencies.AdvancedParts => 9,
+        Currencies.SpecialAbilityBlueprints => 9,
+        Currencies.PassiveAbilityBlueprints => 10,
+        Currencies.AdvancedParts => 11,
         _ => 100
     };
 
@@ -671,4 +728,20 @@ public static class PlannerV2
 
     private static UpgradeCostRowV2 SystemRow(int from, int to, int silver, int systemParts, int advancedParts, string confidence) =>
         new("SYSTEM", from, to, silver, 0, systemParts, advancedParts, "USER_CHART", confidence);
+
+    private static UpgradeCostRowV2 AbilityRow(string upgradeKind, int from, int to, int silver, int blueprints) =>
+        new(upgradeKind, from, to, silver, 0, blueprints, 0, "USER_SUPPLIED", "HIGH");
+
+    private static UpgradeCostRowV2[] AbilityCosts(string upgradeKind) =>
+        upgradeKind.ToUpperInvariant() switch
+        {
+            "SPECIAL" => SpecialCosts,
+            "PASSIVE" => PassiveCosts,
+            _ => throw new InvalidOperationException($"Unknown ability upgrade kind: {upgradeKind}.")
+        };
+
+    private static UpgradeCostRowV2 GetSlotUpgradeCost(SystemSlotDefinitionV2 slot, int fromLevel, int toLevel) =>
+        slot.UpgradeKind.Equals("SYSTEM", StringComparison.OrdinalIgnoreCase)
+            ? GetSystemUpgradeCost(fromLevel, toLevel)
+            : GetAbilityUpgradeCost(slot.UpgradeKind, fromLevel, toLevel);
 }

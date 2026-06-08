@@ -42,7 +42,10 @@ public sealed class Upgrades2CatalogService : IUpgrades2CatalogGateway
                     s.SystemTypeId,
                     systemTypeById[s.SystemTypeId].CurrencyCode,
                     s.SlotLabel,
-                    s.UnlockAircraftLevel))
+                    s.UnlockAircraftLevel,
+                    s.MaxSystemLevel,
+                    s.UsesBranches,
+                    s.UpgradeKind))
                 .ToArray());
 
         return cachedCatalog;
@@ -82,6 +85,8 @@ public sealed class Upgrades2CatalogService : IUpgrades2CatalogGateway
         int SlotOrder,
         int UnlockAircraftLevel,
         int MaxSystemLevel,
+        bool UsesBranches,
+        string UpgradeKind,
         string CatalogConfidence);
 }
 

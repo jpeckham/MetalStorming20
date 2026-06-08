@@ -59,6 +59,24 @@ public class PlannerV2CostTests
         Assert.Equal(15750, total[PlannerV2.Currencies.EngineParts]);
         Assert.Equal(8, total[PlannerV2.Currencies.AdvancedParts]);
     }
+
+    [Fact]
+    public void SpecialCostSum_FromZeroToThree_ReturnsAbilityBlueprintRows()
+    {
+        var total = PlannerV2.SumAbilityCosts("SPECIAL", 0, 3, PlannerV2.Currencies.SpecialAbilityBlueprints);
+
+        Assert.Equal(35000, total[PlannerV2.Currencies.Silver]);
+        Assert.Equal(8, total[PlannerV2.Currencies.SpecialAbilityBlueprints]);
+    }
+
+    [Fact]
+    public void PassiveCostSum_FromZeroToFive_ReturnsAbilityBlueprintRows()
+    {
+        var total = PlannerV2.SumAbilityCosts("PASSIVE", 0, 5, PlannerV2.Currencies.PassiveAbilityBlueprints);
+
+        Assert.Equal(75000, total[PlannerV2.Currencies.Silver]);
+        Assert.Equal(19, total[PlannerV2.Currencies.PassiveAbilityBlueprints]);
+    }
 }
 
 public class PlannerV2MasteryTests
@@ -170,6 +188,50 @@ public class PlannerV2DependencyTests
         Assert.Equal(2900, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
         Assert.Equal(125, result.Deficits.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
         Assert.Equal(450, result.Deficits.Single(c => c.CurrencyCode == PlannerV2.Currencies.EngineParts).Amount);
+    }
+
+    [Fact]
+    public void Plan_SpecialTargetOnLevelSevenAircraft_InsertsAircraftLevelEightUnlockAndUsesSpecialBlueprints()
+    {
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 7)],
+            OwnedSystemNodes: [],
+            EquippedSystemBranches: [],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 7)],
+            SystemTargets: [new SystemTargetV2("generic_special", 3, BranchOwnershipMode.ChosenOnly)],
+            SystemSlots: PlannerV2.GenericSystemSlots));
+
+        Assert.Empty(result.Warnings);
+        Assert.Equal(4, result.Steps.Count);
+        Assert.Equal(PlanStepScope.Aircraft, result.Steps[0].Scope);
+        Assert.Equal(7, result.Steps[0].FromLevel);
+        Assert.Equal(8, result.Steps[0].ToLevel);
+        Assert.Equal(36625, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
+        Assert.Equal(375, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
+        Assert.Equal(8, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.SpecialAbilityBlueprints).Amount);
+    }
+
+    [Fact]
+    public void Plan_PassiveTargetOnLevelElevenAircraft_InsertsAircraftLevelTwelveUnlockAndDoesNotRequireBranchChoice()
+    {
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 11)],
+            OwnedSystemNodes: [],
+            EquippedSystemBranches: [],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 11)],
+            SystemTargets: [new SystemTargetV2("generic_passive", 5, BranchOwnershipMode.ChosenOnly)],
+            SystemSlots: PlannerV2.GenericSystemSlots));
+
+        Assert.Empty(result.Warnings);
+        Assert.Equal(6, result.Steps.Count);
+        Assert.Equal(PlanStepScope.Aircraft, result.Steps[0].Scope);
+        Assert.Equal(11, result.Steps[0].FromLevel);
+        Assert.Equal(12, result.Steps[0].ToLevel);
+        Assert.Equal(77950, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
+        Assert.Equal(650, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
+        Assert.Equal(19, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.PassiveAbilityBlueprints).Amount);
     }
 
     [Fact]
@@ -767,9 +829,20 @@ public class Upgrades2CatalogFiles
 
         using var costs = JsonDocument.Parse(File.ReadAllText(Path.Combine(dataRoot, "upgrade-costs.json")));
         var rows = costs.RootElement.EnumerateArray().ToList();
-        Assert.Equal(27, rows.Count);
+        Assert.Equal(35, rows.Count);
         Assert.Equal(19, rows.Count(r => r.GetProperty("upgradeKind").GetString() == "AIRCRAFT"));
         Assert.Equal(8, rows.Count(r => r.GetProperty("upgradeKind").GetString() == "SYSTEM"));
+        Assert.Equal(3, rows.Count(r => r.GetProperty("upgradeKind").GetString() == "SPECIAL"));
+        Assert.Equal(5, rows.Count(r => r.GetProperty("upgradeKind").GetString() == "PASSIVE"));
+
+        using var slots = JsonDocument.Parse(File.ReadAllText(Path.Combine(dataRoot, "aircraft-system-slots.json")));
+        var slotRows = slots.RootElement.EnumerateArray().ToList();
+        var special = Assert.Single(slotRows, r => r.GetProperty("systemSlotId").GetString() == "generic_special");
+        var passive = Assert.Single(slotRows, r => r.GetProperty("systemSlotId").GetString() == "generic_passive");
+        Assert.Equal(8, special.GetProperty("unlockAircraftLevel").GetInt32());
+        Assert.Equal(3, special.GetProperty("maxSystemLevel").GetInt32());
+        Assert.Equal(12, passive.GetProperty("unlockAircraftLevel").GetInt32());
+        Assert.Equal(5, passive.GetProperty("maxSystemLevel").GetInt32());
     }
 
     private static string FindRepoRoot()

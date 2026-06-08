@@ -79,7 +79,7 @@ public sealed class Upgrades2PlannerUseCase
 
             ownedNodes.AddRange(BuildOwnedNodes(system));
             equippedBranches.AddRange(BuildEquippedBranches(system));
-            var systemTarget = BuildSystemTarget(system);
+            var systemTarget = BuildSystemTarget(system, slot);
             if (systemTarget.TargetSystemLevel > 0)
             {
                 systemTargets.Add(systemTarget);
@@ -97,19 +97,19 @@ public sealed class Upgrades2PlannerUseCase
             MasteryPlan: input.MasteryPlan);
     }
 
-    private static SystemTargetV2 BuildSystemTarget(Upgrades2SystemPlanInput system)
+    private static SystemTargetV2 BuildSystemTarget(Upgrades2SystemPlanInput system, SystemSlotDefinitionV2 slot)
     {
         var targetSystemLevel = TargetSystemLevel(system);
         return new SystemTargetV2(
             system.SystemSlotId,
             targetSystemLevel,
-            BranchOwnershipMode(system),
-            BuildBranchTargets(system, targetSystemLevel),
-            BuildBranchTargetsToOwn(system, targetSystemLevel));
+            BranchOwnershipMode(system, slot),
+            BuildBranchTargets(system, targetSystemLevel, slot),
+            BuildBranchTargetsToOwn(system, targetSystemLevel, slot));
     }
 
-    private static BranchOwnershipMode BranchOwnershipMode(Upgrades2SystemPlanInput system) =>
-        Enumerable.Range(5, 4).Any(level =>
+    private static BranchOwnershipMode BranchOwnershipMode(Upgrades2SystemPlanInput system, SystemSlotDefinitionV2 slot) =>
+        slot.UsesBranches && Enumerable.Range(5, 4).Any(level =>
             IsTarget(system, level, "A") &&
             IsTarget(system, level, "B"))
             ? MetalStorming20.Core.BranchOwnershipMode.Both
@@ -117,9 +117,10 @@ public sealed class Upgrades2PlannerUseCase
 
     private static IReadOnlyDictionary<int, string>? BuildBranchTargets(
         Upgrades2SystemPlanInput system,
-        int targetSystemLevel)
+        int targetSystemLevel,
+        SystemSlotDefinitionV2 slot)
     {
-        return targetSystemLevel >= 5
+        return slot.UsesBranches && targetSystemLevel >= 5
             ? Enumerable.Range(5, targetSystemLevel - 4)
                 .ToDictionary(level => level, level => SelectedBranchFor(system, level) ?? "A")
             : null;
@@ -127,9 +128,10 @@ public sealed class Upgrades2PlannerUseCase
 
     private static IReadOnlyDictionary<int, IReadOnlyList<string>>? BuildBranchTargetsToOwn(
         Upgrades2SystemPlanInput system,
-        int targetSystemLevel)
+        int targetSystemLevel,
+        SystemSlotDefinitionV2 slot)
     {
-        if (targetSystemLevel < 5)
+        if (!slot.UsesBranches || targetSystemLevel < 5)
         {
             return null;
         }

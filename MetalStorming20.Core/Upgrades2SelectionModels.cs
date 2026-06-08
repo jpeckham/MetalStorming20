@@ -271,6 +271,8 @@ public sealed class Upgrades2SystemPlanRow
     public string Id { get; } = Guid.NewGuid().ToString("N");
     public string SystemSlotId { get; set; } = "";
     public string DisplayName { get; set; } = "";
+    public int MaxSystemLevel { get; set; } = 8;
+    public bool UsesBranches { get; set; } = true;
     public Dictionary<string, Upgrades2NodeSelectionState> NodeStates { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyList<string> TargetNodes => NodeStates
@@ -296,7 +298,9 @@ public sealed class Upgrades2SystemPlanRow
         new()
         {
             SystemSlotId = slot.SystemSlotId,
-            DisplayName = slot.DisplayName
+            DisplayName = slot.DisplayName,
+            MaxSystemLevel = slot.MaxSystemLevel,
+            UsesBranches = slot.UsesBranches
         };
 
     public bool IsTarget(int level, string? branchCode) =>
@@ -327,7 +331,8 @@ public sealed class Upgrades2SystemPlanRow
             NodeStates[key] = nextState;
         }
 
-        if (level >= 5 &&
+        if (UsesBranches &&
+            level >= 5 &&
             nextState is Upgrades2NodeSelectionState.Owned or Upgrades2NodeSelectionState.Desired &&
             !HasSelectedPrerequisitePath(level))
         {
@@ -339,13 +344,14 @@ public sealed class Upgrades2SystemPlanRow
 
     public void NormalizeSelection()
     {
-        var maxLevel = TargetSystemLevel;
-        for (var level = 1; level <= Math.Min(maxLevel, 4); level++)
+        var maxLevel = Math.Min(TargetSystemLevel, MaxSystemLevel);
+        var trunkMaxLevel = UsesBranches ? Math.Min(maxLevel, 4) : maxLevel;
+        for (var level = 1; level <= trunkMaxLevel; level++)
         {
             EnsureAtLeastDesired(level, null);
         }
 
-        if (maxLevel >= 5)
+        if (UsesBranches && maxLevel >= 5)
         {
             for (var level = 5; level <= maxLevel; level++)
             {

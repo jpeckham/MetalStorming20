@@ -36,6 +36,46 @@ public class Upgrades2PlannerSessionViewUseCaseTests
         Assert.Equal(Upgrades2NodeSelectionState.Owned, system.Nodes.Single(node => node.Level == 1 && node.BranchCode is null).State);
     }
 
+    [Fact]
+    public void Handle_PresentsAbilityRowsAsUnbranchedTracksWithCatalogMaxLevels()
+    {
+        var session = new Upgrades2PlannerSession();
+        session.ResetSystemRows([
+            new SystemSlotDefinitionV2(
+                "generic_special",
+                PlannerV2.GenericAircraftId,
+                "SPECIAL",
+                PlannerV2.Currencies.SpecialAbilityBlueprints,
+                "Special",
+                8,
+                3,
+                false,
+                "SPECIAL"),
+            new SystemSlotDefinitionV2(
+                "generic_passive",
+                PlannerV2.GenericAircraftId,
+                "PASSIVE",
+                PlannerV2.Currencies.PassiveAbilityBlueprints,
+                "Passive",
+                12,
+                5,
+                false,
+                "PASSIVE")
+        ]);
+        var presenter = new RecordingSessionPresenter();
+        var useCase = new PresentUpgrades2PlannerSessionUseCase();
+
+        useCase.Handle(session, presenter);
+
+        var response = Assert.Single(presenter.Responses);
+        var special = response.Systems.Single(system => system.SystemSlotId == "generic_special");
+        var passive = response.Systems.Single(system => system.SystemSlotId == "generic_passive");
+        Assert.Equal([1, 2, 3], special.Nodes.Select(node => node.Level));
+        Assert.All(special.Nodes, node => Assert.Null(node.BranchCode));
+        Assert.Equal([1, 2, 3, 4, 5], passive.Nodes.Select(node => node.Level));
+        Assert.All(passive.Nodes, node => Assert.Null(node.BranchCode));
+    }
+
     private sealed class RecordingSessionPresenter : IUpgrades2PlannerSessionPresenter
     {
         public List<Upgrades2PlannerSessionResponse> Responses { get; } = [];
