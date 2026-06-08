@@ -7,7 +7,7 @@
 [![Coverage](.github/badges/coverage.svg)](https://jpeckham.github.io/MetalStorming20/coverage/)
 <!-- badges:end -->
 
-MetalStorm Planner is a Blazor WebAssembly app that helps MetalStorm players forecast Upgrades 2.0 costs. The app loads directly into the new planner for aircraft levels, system tracks, branch ownership, required resources, purchase steps, and exports. The UI is static and GitHub Pages-friendly, so it can be published directly from the generated `wwwroot` artifacts without a backend server.
+MetalStorm Planner is a Blazor WebAssembly app that helps MetalStorm players forecast Upgrades 2.0 costs. The app loads directly into the new planner for aircraft levels, system tracks, branch ownership, required resources, and purchase steps. The UI is static and GitHub Pages-friendly, so it can be published directly from the generated `wwwroot` artifacts without a backend server.
 
 ## Projects
 - **MetalStorming20.Core** – Shared library with the `PlannerV2` Upgrades 2.0 engine.
@@ -16,7 +16,7 @@ MetalStorm Planner is a Blazor WebAssembly app that helps MetalStorm players for
 - **MetalStorming20.PlaywrightTests** – MSTest + Playwright project for UI smoke tests against the published site or a local dev server.
 
 ## Route
-- `/` - Upgrades 2.0 planner for a generic aircraft, all upgrade types, square node toggles for levels `1-4` and branch nodes `5A-8B`, required resource totals, purchase steps, JSON export, markdown export, and copyable share summaries.
+- `/` - Upgrades 2.0 planner for a generic aircraft, all upgrade types, square node toggles for levels `1-4` and branch nodes `5A-8B`, required resource totals, and purchase steps.
 
 ## Upgrades 2.0 static catalogs
 The Upgrades 2.0 planner keeps seed data in immutable static JSON files under `MetalStorming20.Web/wwwroot/data/v2/`:
@@ -35,8 +35,8 @@ The seed catalog includes the prompt-provided aircraft and system upgrade cost r
 
 Each node cycles through off, has, and desired. Has nodes define the current state, desired nodes define the target state, and the planner calculates the remaining cost from current state to desired state. Exact branch names and node bonus text remain intentionally incremental seed-data work.
 
-## Browser state and exports
-The planner persists its generic form state to `localStorage` using schema version `2`. Planner results can be exported as JSON for machine-readable sharing, markdown for human-readable work orders, or a copyable share summary. No server API, database, auth, or backend dependency is required.
+## Browser state
+The planner persists its generic form state to `localStorage` using schema version `2`. No server API, database, auth, or backend dependency is required.
 
 ## Running the app locally
 1. Install the .NET 8 SDK.

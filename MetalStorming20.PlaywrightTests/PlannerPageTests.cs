@@ -84,8 +84,10 @@ public class PlannerPageTests : PageTest
         await Expect(Page.GetByText("ENGINE_PARTS 950", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Aircraft", Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText("Aircraft 5->6")).ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Export JSON" })).ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Export Markdown" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Export JSON" })).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Export Markdown" })).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Copy Share Summary" })).ToHaveCountAsync(0);
+        await Expect(Page.GetByLabel("Export output")).ToHaveCountAsync(0);
     }
 
     [TestMethod]
@@ -110,7 +112,7 @@ public class PlannerPageTests : PageTest
     }
 
     [TestMethod]
-    public async Task Upgrades2GenericSystemRowsShowAllUpgradeTypesAndCopyShareSummary()
+    public async Task Upgrades2GenericSystemRowsShowAllUpgradeTypesWithoutExportShareControls()
     {
         await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
         await Page.EvaluateAsync("localStorage.clear()");
@@ -135,10 +137,10 @@ public class PlannerPageTests : PageTest
         await Expect(Page.GetByText("MISSILE_PARTS 400", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText("ROCKET_PARTS 200", new() { Exact = true })).ToBeVisibleAsync();
 
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Copy Share Summary" }).ClickAsync();
-        await Expect(Page.GetByLabel("Export output")).ToContainTextAsync("# MetalStorming20 Upgrades 2.0 Plan");
-        await Expect(Page.GetByLabel("Export output")).ToContainTextAsync("Main/Radar Missile");
-        await Expect(Page.GetByLabel("Export output")).ToContainTextAsync("Secondary/IR Missile");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Export JSON" })).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Export Markdown" })).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Copy Share Summary" })).ToHaveCountAsync(0);
+        await Expect(Page.GetByLabel("Export output")).ToHaveCountAsync(0);
     }
 
     [TestMethod]

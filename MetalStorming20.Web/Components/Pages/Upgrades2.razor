@@ -8,7 +8,7 @@
 <PageTitle>Upgrades 2.0 Planner</PageTitle>
 
 <h1>Upgrades 2.0 Planner</h1>
-<p class="lead">Plan aircraft levels, every system track, branch ownership, required resources, and shareable exports.</p>
+<p class="lead">Plan aircraft levels, every system track, branch ownership, and required resources.</p>
 <div class="alert alert-info py-2" role="note">
     Green owned nodes are your current state. Blue desired nodes are your target state. Costs are calculated for the gap between owned and desired. If you jump to a branch node such as 7A without an owned path before it, the planner marks the required prior path green automatically.
 </div>
@@ -125,12 +125,6 @@
     }
 </style>
 
-<div class="d-flex flex-wrap gap-2 align-items-center my-4">
-    <button class="btn btn-outline-secondary" @onclick="ExportJson" disabled="@(result is null)">Export JSON</button>
-    <button class="btn btn-outline-secondary" @onclick="ExportMarkdown" disabled="@(result is null)">Export Markdown</button>
-    <button class="btn btn-outline-secondary" @onclick="CopyShareSummary" disabled="@(result is null)">Copy Share Summary</button>
-</div>
-
 @if (result is not null)
 {
     <section class="mt-4">
@@ -228,14 +222,6 @@
     </section>
 }
 
-@if (!string.IsNullOrWhiteSpace(exportText))
-{
-    <section class="mt-3">
-        <label for="export-output" class="form-label">Export output</label>
-        <textarea id="export-output" class="form-control" rows="10" readonly>@exportText</textarea>
-    </section>
-}
-
 @code {
     private const string StorageKey = "metalstorming20.upgrades2.state";
     private static readonly JsonSerializerOptions LocalStateJsonOptions = new(JsonSerializerDefaults.Web);
@@ -250,7 +236,6 @@
     private int targetAircraftLevel => aircraftLevelPlan.TargetAircraftLevel;
 
     private PlannerResultV2? result;
-    private string? exportText;
     private string currencyFilter = "";
     private bool localStateLoaded;
 
@@ -347,79 +332,12 @@
     {
         NormalizeInputs();
         result = PlannerV2.Plan(BuildRequest());
-        exportText = null;
     }
 
     private async Task RecalculatePlannerAndSave()
     {
         RecalculatePlanner();
         await SaveState();
-    }
-
-    private void ExportJson()
-    {
-        if (result is null)
-        {
-            return;
-        }
-
-        var payload = new
-        {
-            schemaVersion = 2,
-            currentState = BuildRequest(),
-            plannerResult = result
-        };
-        exportText = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
-    }
-
-    private void ExportMarkdown()
-    {
-        exportText = BuildMarkdownSummary();
-    }
-
-    private async Task CopyShareSummary()
-    {
-        exportText = BuildMarkdownSummary();
-        if (!string.IsNullOrWhiteSpace(exportText))
-        {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", exportText);
-        }
-    }
-
-    private string BuildMarkdownSummary()
-    {
-        if (result is null)
-        {
-            return "";
-        }
-
-        var lines = new List<string>
-        {
-            "# MetalStorming20 Upgrades 2.0 Plan",
-            "",
-            "## Target",
-            $"- Aircraft level: {currentAircraftLevel}->{targetAircraftLevel}",
-            $"- Mastery level: {masteryLevelPlan.CurrentMasteryLevel}->{masteryLevelPlan.PlannedMasteryLevel}",
-            $"- Gold mastery: {goldMasteryStatus}",
-            "",
-            "## System Tracks"
-        };
-
-        lines.AddRange(systemPlans.Select(row => $"- {row.DisplayName}: {SelectedNodeSummary(row)}"));
-        lines.Add("");
-        lines.Add("## Totals Required");
-        lines.AddRange(result.TotalsRequired.Select(t => $"- {t.CurrencyCode}: {t.Amount:N0}"));
-        lines.Add("");
-        lines.Add("## Mastery Rebate");
-        lines.AddRange(result.MasteryRebate.Count == 0 ? ["- None"] : result.MasteryRebate.Select(t => $"- {t.CurrencyCode}: {t.Amount:N0}"));
-        lines.Add("");
-        lines.Add("## Net Grind Needed");
-        lines.AddRange(result.NetGrindNeeded.Count == 0 ? ["- None"] : result.NetGrindNeeded.Select(t => $"- {t.CurrencyCode}: {t.Amount:N0}"));
-        lines.Add("");
-        lines.Add("## Purchase Steps");
-        lines.AddRange(result.Steps.Select(s => $"- {s.Order}. {DisplayStepGroup(s.SystemSlotId ?? "aircraft")} {s.FromLevel}->{s.ToLevel}: {string.Join(", ", s.Costs.Select(c => $"{c.CurrencyCode} {c.Amount:N0}"))}"));
-
-        return string.Join(Environment.NewLine, lines);
     }
 
     private PlannerRequestV2 BuildRequest()
@@ -592,12 +510,6 @@
     }
 
     private static string NodeLabel(int level, string branchCode) => $"{level}{branchCode}";
-
-    private static string SelectedNodeSummary(SystemPlanRow row) =>
-        row.TargetNodes.Count == 0
-            ? "none"
-            : string.Join(", ", row.TargetNodes.OrderBy(SystemPlanRow.ParseLevel).ThenBy(node => node, StringComparer.OrdinalIgnoreCase).Select(node =>
-                row.StateFor(node) == NodeToggleState.Has ? $"{node} has" : $"{node} desired"));
 
     private enum NodeToggleState
     {

@@ -2,6 +2,19 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "kill stale MetalStorming20.Web debug processes",
+      "type": "process",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/.vscode/kill-metalstorming20-web-debug.ps1"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "build MetalStorming20.Web",
       "type": "process",
       "command": "dotnet",
@@ -14,6 +27,15 @@
         "kind": "build",
         "isDefault": true
       }
+    },
+    {
+      "label": "prelaunch MetalStorming20.Web",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "kill stale MetalStorming20.Web debug processes",
+        "build MetalStorming20.Web"
+      ],
+      "problemMatcher": []
     }
   ]
 }

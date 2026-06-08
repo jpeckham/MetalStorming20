@@ -24,7 +24,7 @@ Planner at `/`:
 - Levels `1-4` are single buttons; branch levels are stacked as `5A/5B`, `6A/6B`, `7A/7B`, and `8A/8B`.
 - Each node cycles through off, has, and desired. Has is your current state; desired is the target state. Costs are calculated for the gap between current and target.
 - The planner recalculates automatically as you change aircraft and system nodes.
-- Review totals, purchase steps, warnings, filters, JSON export, markdown export, and a copyable share summary.
+- Review totals, purchase steps, warnings, and filters.
 
 Static Catalogs
 ---------------
