@@ -28,6 +28,11 @@ public class PlannerPageTests : PageTest
         await button.ClickAsync();
     }
 
+    private static async Task MarkSystemNodeAsHas(ILocator systemRow, string node)
+    {
+        await systemRow.GetByRole(AriaRole.Button, new() { Name = node }).ClickAsync();
+    }
+
     private async Task MarkMasteryLevelAsDesired(int level)
     {
         var masteryLevel = Page
@@ -406,6 +411,48 @@ public class PlannerPageTests : PageTest
         await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "7B" })).ToHaveAttributeAsync("data-state", "desired");
         await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "5B" })).ToHaveAttributeAsync("data-state", "off");
         await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "6B" })).ToHaveAttributeAsync("data-state", "off");
+    }
+
+    [TestMethod]
+    public async Task Upgrades2MixedOwnedBranchesAndLowerAlternateTargetsCalculateWithoutWarnings()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        var fuselage = Page.GetByTestId("system-fuselage");
+        await MarkSystemNodeAsHas(fuselage, "5A");
+        await MarkSystemNodeAsHas(fuselage, "6A");
+        await MarkSystemNodeAsHas(fuselage, "7B");
+        await MarkSystemNodeAsDesired(fuselage, "8B");
+
+        var engines = Page.GetByTestId("system-engines");
+        foreach (var node in new[] { "5A", "5B", "6A", "7B", "8B" })
+        {
+            await MarkSystemNodeAsHas(engines, node);
+        }
+
+        var avionics = Page.GetByTestId("system-avionics");
+        foreach (var node in new[] { "5A", "6A", "6B" })
+        {
+            await MarkSystemNodeAsHas(avionics, node);
+        }
+
+        var cannons = Page.GetByTestId("system-cannons");
+        foreach (var node in new[] { "5A", "6A", "7B", "8B" })
+        {
+            await MarkSystemNodeAsHas(cannons, node);
+        }
+
+        await MarkSystemNodeAsDesired(cannons, "5B");
+        await MarkSystemNodeAsDesired(cannons, "6B");
+
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Warnings" })).ToHaveCountAsync(0);
+        await Expect(Page.GetByText("FUSELAGE_PARTS 3,000", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("CANNON_PARTS 2,100", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Fuselage 7->8")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Cannons 4->5")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Cannons 5->6")).ToBeVisibleAsync();
     }
 
     [TestMethod]

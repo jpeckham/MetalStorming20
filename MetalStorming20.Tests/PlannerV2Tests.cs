@@ -295,6 +295,352 @@ public class PlannerV2DependencyTests
     }
 
     [Fact]
+    public void Plan_MixedBranchOwnershipAtPriorLevels_IsConsistent()
+    {
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 6)],
+            OwnedSystemNodes: [
+                new OwnedSystemNodeV2("generic_fuselage", 1, null),
+                new OwnedSystemNodeV2("generic_fuselage", 2, null),
+                new OwnedSystemNodeV2("generic_fuselage", 3, null),
+                new OwnedSystemNodeV2("generic_fuselage", 4, null),
+                new OwnedSystemNodeV2("generic_fuselage", 5, "A"),
+                new OwnedSystemNodeV2("generic_fuselage", 6, "A"),
+                new OwnedSystemNodeV2("generic_fuselage", 7, "B")
+            ],
+            EquippedSystemBranches: [
+                new EquippedSystemBranchV2("generic_fuselage", 5, "A"),
+                new EquippedSystemBranchV2("generic_fuselage", 6, "A"),
+                new EquippedSystemBranchV2("generic_fuselage", 7, "B")
+            ],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 6)],
+            SystemTargets: [
+                new SystemTargetV2(
+                    "generic_fuselage",
+                    8,
+                    BranchOwnershipMode.ChosenOnly,
+                    new Dictionary<int, string> { [5] = "A", [6] = "A", [7] = "B", [8] = "B" },
+                    new Dictionary<int, IReadOnlyList<string>>
+                    {
+                        [5] = ["A"],
+                        [6] = ["A"],
+                        [7] = ["B"],
+                        [8] = ["B"]
+                    })
+            ],
+            SystemSlots: PlannerV2.GenericSystemSlots));
+
+        Assert.Empty(result.Warnings);
+        var step = Assert.Single(result.Steps.Where(s => s.SystemSlotId == "generic_fuselage"));
+        Assert.Equal(7, step.FromLevel);
+        Assert.Equal(8, step.ToLevel);
+        Assert.Equal("B", step.BranchCode);
+    }
+
+    [Fact]
+    public void Plan_ExplicitAlternateBranchTargetsBelowHighestOwnedLevel_AreCalculated()
+    {
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 6)],
+            OwnedSystemNodes: [
+                new OwnedSystemNodeV2("generic_cannons", 1, null),
+                new OwnedSystemNodeV2("generic_cannons", 2, null),
+                new OwnedSystemNodeV2("generic_cannons", 3, null),
+                new OwnedSystemNodeV2("generic_cannons", 4, null),
+                new OwnedSystemNodeV2("generic_cannons", 5, "A"),
+                new OwnedSystemNodeV2("generic_cannons", 6, "A"),
+                new OwnedSystemNodeV2("generic_cannons", 7, "B"),
+                new OwnedSystemNodeV2("generic_cannons", 8, "B")
+            ],
+            EquippedSystemBranches: [
+                new EquippedSystemBranchV2("generic_cannons", 5, "A"),
+                new EquippedSystemBranchV2("generic_cannons", 6, "A"),
+                new EquippedSystemBranchV2("generic_cannons", 7, "B"),
+                new EquippedSystemBranchV2("generic_cannons", 8, "B")
+            ],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 6)],
+            SystemTargets: [
+                new SystemTargetV2(
+                    "generic_cannons",
+                    8,
+                    BranchOwnershipMode.Both,
+                    new Dictionary<int, string> { [5] = "A", [6] = "A", [7] = "B", [8] = "B" },
+                    new Dictionary<int, IReadOnlyList<string>>
+                    {
+                        [5] = ["A", "B"],
+                        [6] = ["A", "B"],
+                        [7] = ["B"],
+                        [8] = ["B"]
+                    })
+            ],
+            SystemSlots: PlannerV2.GenericSystemSlots));
+
+        Assert.Empty(result.Warnings);
+        Assert.Collection(
+            result.Steps.Where(s => s.SystemSlotId == "generic_cannons"),
+            step =>
+            {
+                Assert.Equal(4, step.FromLevel);
+                Assert.Equal(5, step.ToLevel);
+                Assert.Equal("B", step.BranchCode);
+            },
+            step =>
+            {
+                Assert.Equal(5, step.FromLevel);
+                Assert.Equal(6, step.ToLevel);
+                Assert.Equal("B", step.BranchCode);
+            });
+    }
+
+    [Fact]
+    public void Plan_TargetEquippedBranchThatIsAlsoPlannedToOwn_DoesNotWarnAsUnowned()
+    {
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 6)],
+            OwnedSystemNodes: [
+                new OwnedSystemNodeV2("generic_cannons", 1, null),
+                new OwnedSystemNodeV2("generic_cannons", 2, null),
+                new OwnedSystemNodeV2("generic_cannons", 3, null),
+                new OwnedSystemNodeV2("generic_cannons", 4, null),
+                new OwnedSystemNodeV2("generic_cannons", 5, "B"),
+                new OwnedSystemNodeV2("generic_cannons", 6, "B"),
+                new OwnedSystemNodeV2("generic_cannons", 7, "B"),
+                new OwnedSystemNodeV2("generic_cannons", 8, "B")
+            ],
+            EquippedSystemBranches: [
+                new EquippedSystemBranchV2("generic_cannons", 5, "B"),
+                new EquippedSystemBranchV2("generic_cannons", 6, "B"),
+                new EquippedSystemBranchV2("generic_cannons", 7, "B"),
+                new EquippedSystemBranchV2("generic_cannons", 8, "B")
+            ],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 6)],
+            SystemTargets: [
+                new SystemTargetV2(
+                    "generic_cannons",
+                    8,
+                    BranchOwnershipMode.ChosenOnly,
+                    new Dictionary<int, string> { [5] = "B", [6] = "B", [7] = "A", [8] = "A" },
+                    new Dictionary<int, IReadOnlyList<string>>
+                    {
+                        [5] = ["B"],
+                        [6] = ["B"],
+                        [7] = ["A"],
+                        [8] = ["A"]
+                    })
+            ],
+            SystemSlots: PlannerV2.GenericSystemSlots));
+
+        Assert.Empty(result.Warnings);
+        Assert.Collection(
+            result.Steps.Where(s => s.SystemSlotId == "generic_cannons"),
+            step =>
+            {
+                Assert.Equal(6, step.FromLevel);
+                Assert.Equal(7, step.ToLevel);
+                Assert.Equal("A", step.BranchCode);
+            },
+            step =>
+            {
+                Assert.Equal(7, step.FromLevel);
+                Assert.Equal(8, step.ToLevel);
+                Assert.Equal("A", step.BranchCode);
+            });
+    }
+
+    [Fact]
+    public void Plan_OwnedAnyLevelFiveBranch_AllowsPlanningEitherLevelSixBranch()
+    {
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 6)],
+            OwnedSystemNodes: [
+                new OwnedSystemNodeV2("generic_rockets", 1, null),
+                new OwnedSystemNodeV2("generic_rockets", 2, null),
+                new OwnedSystemNodeV2("generic_rockets", 3, null),
+                new OwnedSystemNodeV2("generic_rockets", 4, null),
+                new OwnedSystemNodeV2("generic_rockets", 5, "B")
+            ],
+            EquippedSystemBranches: [new EquippedSystemBranchV2("generic_rockets", 5, "B")],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 6)],
+            SystemTargets: [
+                new SystemTargetV2(
+                    "generic_rockets",
+                    6,
+                    BranchOwnershipMode.ChosenOnly,
+                    new Dictionary<int, string> { [5] = "B", [6] = "A" },
+                    new Dictionary<int, IReadOnlyList<string>>
+                    {
+                        [5] = ["B"],
+                        [6] = ["A"]
+                    })
+            ],
+            SystemSlots: PlannerV2.GenericSystemSlots));
+
+        Assert.Empty(result.Warnings);
+        var step = Assert.Single(result.Steps.Where(s => s.SystemSlotId == "generic_rockets"));
+        Assert.Equal(5, step.FromLevel);
+        Assert.Equal(6, step.ToLevel);
+        Assert.Equal("A", step.BranchCode);
+    }
+
+    [Fact]
+    public void Plan_PlannedAnyLevelFiveBranch_AllowsPlanningEitherLevelSixBranch()
+    {
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 6)],
+            OwnedSystemNodes: [
+                new OwnedSystemNodeV2("generic_rockets", 1, null),
+                new OwnedSystemNodeV2("generic_rockets", 2, null),
+                new OwnedSystemNodeV2("generic_rockets", 3, null),
+                new OwnedSystemNodeV2("generic_rockets", 4, null)
+            ],
+            EquippedSystemBranches: [],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 6)],
+            SystemTargets: [
+                new SystemTargetV2(
+                    "generic_rockets",
+                    6,
+                    BranchOwnershipMode.ChosenOnly,
+                    new Dictionary<int, string> { [5] = "B", [6] = "A" },
+                    new Dictionary<int, IReadOnlyList<string>>
+                    {
+                        [5] = ["B"],
+                        [6] = ["A"]
+                    })
+            ],
+            SystemSlots: PlannerV2.GenericSystemSlots));
+
+        Assert.Empty(result.Warnings);
+        Assert.Collection(
+            result.Steps.Where(s => s.SystemSlotId == "generic_rockets"),
+            step =>
+            {
+                Assert.Equal(4, step.FromLevel);
+                Assert.Equal(5, step.ToLevel);
+                Assert.Equal("B", step.BranchCode);
+            },
+            step =>
+            {
+                Assert.Equal(5, step.FromLevel);
+                Assert.Equal(6, step.ToLevel);
+                Assert.Equal("A", step.BranchCode);
+            });
+    }
+
+    [Theory]
+    [InlineData(5, "A", 6, "B")]
+    [InlineData(5, "B", 6, "A")]
+    [InlineData(6, "A", 7, "B")]
+    [InlineData(6, "B", 7, "A")]
+    [InlineData(7, "A", 8, "B")]
+    [InlineData(7, "B", 8, "A")]
+    public void Plan_OwnedAnyPriorBranchLevel_AllowsPlanningEitherBranchAtNextLevel(
+        int ownedLevel,
+        string ownedBranch,
+        int targetLevel,
+        string targetBranch)
+    {
+        var ownedNodes = new List<OwnedSystemNodeV2>
+        {
+            new("generic_main_radar_missile", 1, null),
+            new("generic_main_radar_missile", 2, null),
+            new("generic_main_radar_missile", 3, null),
+            new("generic_main_radar_missile", 4, null)
+        };
+
+        for (var level = 5; level <= ownedLevel; level++)
+        {
+            ownedNodes.Add(new OwnedSystemNodeV2("generic_main_radar_missile", level, ownedBranch));
+        }
+
+        var targetBranches = Enumerable.Range(5, targetLevel - 4)
+            .ToDictionary(
+                level => level,
+                level => level == targetLevel
+                    ? targetBranch
+                    : ownedBranch);
+
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 6)],
+            OwnedSystemNodes: ownedNodes,
+            EquippedSystemBranches: ownedNodes
+                .Where(node => node.SystemLevel >= 5)
+                .Select(node => new EquippedSystemBranchV2(node.SystemSlotId, node.SystemLevel, node.BranchCode!))
+                .ToArray(),
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 6)],
+            SystemTargets: [
+                new SystemTargetV2(
+                    "generic_main_radar_missile",
+                    targetLevel,
+                    BranchOwnershipMode.ChosenOnly,
+                    targetBranches,
+                    targetBranches.ToDictionary(
+                        target => target.Key,
+                        target => (IReadOnlyList<string>)[target.Value]))
+            ],
+            SystemSlots: PlannerV2.GenericSystemSlots));
+
+        Assert.Empty(result.Warnings);
+        var step = Assert.Single(result.Steps.Where(s => s.SystemSlotId == "generic_main_radar_missile"));
+        Assert.Equal(ownedLevel, step.FromLevel);
+        Assert.Equal(targetLevel, step.ToLevel);
+        Assert.Equal(targetBranch, step.BranchCode);
+    }
+
+    [Theory]
+    [InlineData(5, "A", 6, "B")]
+    [InlineData(5, "B", 6, "A")]
+    [InlineData(6, "A", 7, "B")]
+    [InlineData(6, "B", 7, "A")]
+    [InlineData(7, "A", 8, "B")]
+    [InlineData(7, "B", 8, "A")]
+    public void Plan_PlannedAnyPriorBranchLevel_AllowsPlanningEitherBranchAtNextLevel(
+        int plannedPriorLevel,
+        string plannedPriorBranch,
+        int targetLevel,
+        string targetBranch)
+    {
+        var targetBranches = Enumerable.Range(5, targetLevel - 4)
+            .ToDictionary(
+                level => level,
+                level => level == targetLevel
+                    ? targetBranch
+                    : plannedPriorBranch);
+
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 6)],
+            OwnedSystemNodes: [
+                new OwnedSystemNodeV2("generic_secondary_ir_missile", 1, null),
+                new OwnedSystemNodeV2("generic_secondary_ir_missile", 2, null),
+                new OwnedSystemNodeV2("generic_secondary_ir_missile", 3, null),
+                new OwnedSystemNodeV2("generic_secondary_ir_missile", 4, null)
+            ],
+            EquippedSystemBranches: [],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 6)],
+            SystemTargets: [
+                new SystemTargetV2(
+                    "generic_secondary_ir_missile",
+                    targetLevel,
+                    BranchOwnershipMode.ChosenOnly,
+                    targetBranches,
+                    targetBranches.ToDictionary(
+                        target => target.Key,
+                        target => (IReadOnlyList<string>)[target.Value]))
+            ],
+            SystemSlots: PlannerV2.GenericSystemSlots));
+
+        Assert.Empty(result.Warnings);
+        var steps = result.Steps.Where(s => s.SystemSlotId == "generic_secondary_ir_missile").ToArray();
+        Assert.Contains(steps, step => step.FromLevel == plannedPriorLevel && step.ToLevel == targetLevel && step.BranchCode == targetBranch);
+    }
+
+    [Fact]
     public void Plan_DuplicateSystemSlotIds_ReturnsWarningAndNoPlan()
     {
         var duplicatedSlots = PlannerV2.DefaultSystemSlots.Concat([PlannerV2.DefaultSystemSlots[0]]).ToArray();

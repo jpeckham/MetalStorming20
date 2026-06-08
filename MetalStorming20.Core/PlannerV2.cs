@@ -51,7 +51,8 @@ public sealed record SystemTargetV2(
     string SystemSlotId,
     int TargetSystemLevel,
     BranchOwnershipMode OwnershipMode,
-    IReadOnlyDictionary<int, string>? TargetEquippedBranches = null);
+    IReadOnlyDictionary<int, string>? TargetEquippedBranches = null,
+    IReadOnlyDictionary<int, IReadOnlyList<string>>? TargetBranchesToOwn = null);
 
 public sealed record SystemSlotDefinitionV2(
     string SystemSlotId,
@@ -282,8 +283,7 @@ public static class PlannerV2
                 .OrderBy(t => t.SystemSlotId, StringComparer.OrdinalIgnoreCase))
             {
                 var slot = slotsById[systemTarget.SystemSlotId];
-                var currentSystemLevel = CurrentSystemLevel(request.OwnedSystemNodes, systemTarget.SystemSlotId);
-                for (var level = currentSystemLevel; level < systemTarget.TargetSystemLevel; level++)
+                for (var level = 0; level < systemTarget.TargetSystemLevel; level++)
                 {
                     var toLevel = level + 1;
                     var branchCodes = BranchCodesToPurchase(systemTarget, toLevel);
@@ -405,7 +405,8 @@ public static class PlannerV2
                         warnings.Add($"{target.SystemSlotId} branch choice must be A or B.");
                     }
                     else if (equipped.Key <= currentSystemLevel &&
-                        !IsOwned(request.OwnedSystemNodes, target.SystemSlotId, equipped.Key, equipped.Value))
+                        !IsOwned(request.OwnedSystemNodes, target.SystemSlotId, equipped.Key, equipped.Value) &&
+                        !IsPlannedTargetBranch(target, equipped.Key, equipped.Value))
                     {
                         warnings.Add($"{target.SystemSlotId} branch {equipped.Value} at level {equipped.Key} is not owned.");
                     }
@@ -455,9 +456,7 @@ public static class PlannerV2
 
                 for (var level = 5; level < branchNode.SystemLevel; level++)
                 {
-                    if (!nodes.Any(n =>
-                            n.SystemLevel == level &&
-                            string.Equals(n.BranchCode, branchNode.BranchCode, StringComparison.OrdinalIgnoreCase)))
+                    if (!nodes.Any(n => n.SystemLevel == level && IsBranchCode(n.BranchCode ?? "")))
                     {
                         warnings.Add($"{slotGroup.Key} has an inconsistent ownership graph: branch {branchNode.BranchCode} level {branchNode.SystemLevel} requires level {level}.");
                     }
@@ -473,6 +472,17 @@ public static class PlannerV2
         if (toLevel < 5)
         {
             return [null];
+        }
+
+        if (target.TargetBranchesToOwn is not null &&
+            target.TargetBranchesToOwn.TryGetValue(toLevel, out var branchCodes) &&
+            branchCodes.Count > 0)
+        {
+            return branchCodes
+                .Where(IsBranchCode)
+                .Select(branchCode => branchCode.ToUpperInvariant())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
 
         if (target.OwnershipMode == BranchOwnershipMode.Both)
@@ -498,6 +508,13 @@ public static class PlannerV2
             n.SystemSlotId.Equals(systemSlotId, StringComparison.OrdinalIgnoreCase) &&
             n.SystemLevel == level &&
             string.Equals(n.BranchCode, branchCode, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsPlannedTargetBranch(SystemTargetV2 target, int level, string branchCode)
+    {
+        return target.TargetBranchesToOwn is not null &&
+            target.TargetBranchesToOwn.TryGetValue(level, out var branches) &&
+            branches.Any(branch => branch.Equals(branchCode, StringComparison.OrdinalIgnoreCase));
     }
 
     private static IReadOnlyList<CurrencyAmountV2> TotalsFor(IReadOnlyList<PlanStepV2> steps)

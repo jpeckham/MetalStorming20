@@ -352,7 +352,8 @@
                 p.SystemSlotId,
                 p.TargetSystemLevel,
                 p.BranchOwnershipMode,
-                BuildBranchTargets(p))).ToArray(),
+                BuildBranchTargets(p),
+                BuildBranchTargetsToOwn(p))).ToArray(),
             SystemSlots: systemSlots,
             MasteryPlan: BuildMasteryPlan());
     }
@@ -368,6 +369,27 @@
         return row.TargetSystemLevel >= 5
             ? Enumerable.Range(5, row.TargetSystemLevel - 4).ToDictionary(level => level, level => row.SelectedBranchFor(level) ?? "A")
             : null;
+    }
+
+    private static IReadOnlyDictionary<int, IReadOnlyList<string>>? BuildBranchTargetsToOwn(SystemPlanRow row)
+    {
+        if (row.TargetSystemLevel < 5)
+        {
+            return null;
+        }
+
+        return Enumerable.Range(5, row.TargetSystemLevel - 4)
+            .Select(level => new
+            {
+                Level = level,
+                Branches = new[] { "A", "B" }
+                    .Where(branch => row.IsTarget(level, branch))
+                    .ToArray()
+            })
+            .Where(target => target.Branches.Length > 0)
+            .ToDictionary(
+                target => target.Level,
+                target => (IReadOnlyList<string>)target.Branches);
     }
 
     private static IEnumerable<OwnedSystemNodeV2> BuildOwnedNodes(SystemPlanRow row) =>
