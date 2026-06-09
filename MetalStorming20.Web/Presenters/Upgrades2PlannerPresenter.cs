@@ -41,6 +41,10 @@ public sealed record Upgrades2PlannerResultViewModel(
     IReadOnlyList<Upgrades2CurrencyAmountViewModel> TotalsRequired,
     bool HasMasteryRebate,
     IReadOnlyList<Upgrades2CurrencyAmountViewModel> MasteryRebate,
+    bool HasMasteryNormalRebate,
+    IReadOnlyList<Upgrades2CurrencyAmountViewModel> MasteryNormalRebate,
+    bool HasMasteryGoldRebate,
+    IReadOnlyList<Upgrades2CurrencyAmountViewModel> MasteryGoldRebate,
     bool HasNetGrindNeeded,
     IReadOnlyList<Upgrades2CurrencyAmountViewModel> NetGrindNeeded,
     IReadOnlyList<Upgrades2PlanStepViewModel> Steps);
@@ -67,12 +71,18 @@ public sealed class Upgrades2PlannerPresenter : IUpgrades2PlannerPresenter
         IReadOnlyDictionary<string, string> systemDisplayNames)
     {
         var netGrindNeeded = result.NetGrindNeeded.Select(ToCurrencyAmountViewModel).ToArray();
+        var masteryNormalRebate = result.MasteryNormalRebate.Select(ToCurrencyAmountViewModel).ToArray();
+        var masteryGoldRebate = result.MasteryGoldRebate.Select(ToCurrencyAmountViewModel).ToArray();
         return new Upgrades2PlannerResultViewModel(
             result.Warnings.Count > 0,
             result.Warnings,
             result.TotalsRequired.Select(ToCurrencyAmountViewModel).ToArray(),
             result.MasteryRebate.Count > 0,
             result.MasteryRebate.Select(ToCurrencyAmountViewModel).ToArray(),
+            masteryNormalRebate.Length > 0,
+            masteryNormalRebate,
+            masteryGoldRebate.Length > 0,
+            masteryGoldRebate,
             netGrindNeeded.Length > 0,
             netGrindNeeded,
             result.Steps.Select(step => ToPlanStepViewModel(step, systemDisplayNames)).ToArray());

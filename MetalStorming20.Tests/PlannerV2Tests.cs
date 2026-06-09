@@ -115,6 +115,10 @@ public class PlannerV2MasteryTests
             MasteryPlan: new MasteryPlanV2(1, 23, GoldMasteryStatus.Planned)));
 
         Assert.Empty(result.Warnings);
+        Assert.Equal(1900, result.MasteryNormalRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
+        Assert.Equal(4400, result.MasteryNormalRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
+        Assert.Equal(3000, result.MasteryGoldRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
+        Assert.Equal(12500, result.MasteryGoldRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
         Assert.Equal(4900, result.MasteryRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
         Assert.Equal(16900, result.MasteryRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
         Assert.Equal(6300, result.NetGrindNeeded.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
@@ -159,6 +163,42 @@ public class PlannerV2MasteryTests
         Assert.Empty(result.Steps);
         Assert.DoesNotContain(result.TotalsRequired, c => c.CurrencyCode == PlannerV2.Currencies.Gold);
         Assert.DoesNotContain(result.NetGrindNeeded, c => c.CurrencyCode == PlannerV2.Currencies.Gold);
+    }
+
+    [Fact]
+    public void Plan_OwnedGoldMastery_DoesNotRebateGoldRewardsFromGreenMasteryBoxes()
+    {
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 7)],
+            OwnedSystemNodes: [],
+            EquippedSystemBranches: [],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 20)],
+            SystemTargets: [],
+            SystemSlots: PlannerV2.GenericSystemSlots,
+            MasteryPlan: new MasteryPlanV2(7, 7, GoldMasteryStatus.Owned)));
+
+        Assert.Empty(result.MasteryRebate);
+    }
+
+    [Fact]
+    public void Plan_PlannedGoldMastery_RebatesGoldRewardsFromGreenMasteryBoxes()
+    {
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2(PlannerV2.GenericAircraftId, true, 7)],
+            OwnedSystemNodes: [],
+            EquippedSystemBranches: [],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2(PlannerV2.GenericAircraftId, 20)],
+            SystemTargets: [],
+            SystemSlots: PlannerV2.GenericSystemSlots,
+            MasteryPlan: new MasteryPlanV2(7, 7, GoldMasteryStatus.Planned)));
+
+        Assert.Empty(result.MasteryNormalRebate);
+        Assert.Equal(1000, result.MasteryRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
+        Assert.Equal(1500, result.MasteryRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
+        Assert.Equal(1000, result.MasteryGoldRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
+        Assert.Equal(1500, result.MasteryGoldRebate.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
     }
 }
 

@@ -92,6 +92,8 @@ public sealed record PlannerResultV2(
     IReadOnlyList<CurrencyAmountV2> Deficits,
     IReadOnlyList<PlanStepV2> Steps,
     IReadOnlyList<CurrencyAmountV2> MasteryRebate,
+    IReadOnlyList<CurrencyAmountV2> MasteryNormalRebate,
+    IReadOnlyList<CurrencyAmountV2> MasteryGoldRebate,
     IReadOnlyList<CurrencyAmountV2> NetGrindNeeded);
 
 public static class PlannerV2
@@ -283,7 +285,7 @@ public static class PlannerV2
         var warnings = Validate(request);
         if (warnings.Count > 0)
         {
-            return new PlannerResultV2(warnings, [], [], [], [], []);
+            return new PlannerResultV2(warnings, [], [], [], [], [], [], []);
         }
 
         var steps = new List<PlanStepV2>();
@@ -362,9 +364,11 @@ public static class PlannerV2
         AddMasteryPurchaseSteps(steps, request.MasteryPlan);
         var totals = TotalsFor(steps);
         var deficits = DeficitsFor(totals, request.ResourceBalances);
-        var masteryRebate = MasteryRebateFor(request.MasteryPlan);
+        var masteryNormalRebate = MasteryNormalRebateFor(request.MasteryPlan);
+        var masteryGoldRebate = MasteryGoldRebateFor(request.MasteryPlan);
+        var masteryRebate = CombineCurrencyAmounts(masteryNormalRebate, masteryGoldRebate);
         var netGrindNeeded = NetGrindNeededFor(deficits, masteryRebate);
-        return new PlannerResultV2([], totals, deficits, steps, masteryRebate, netGrindNeeded);
+        return new PlannerResultV2([], totals, deficits, steps, masteryRebate, masteryNormalRebate, masteryGoldRebate, netGrindNeeded);
     }
 
     private static List<string> Validate(PlannerRequestV2 request)
@@ -626,7 +630,7 @@ public static class PlannerV2
         return SortCurrencyAmounts(deficits);
     }
 
-    private static IReadOnlyList<CurrencyAmountV2> MasteryRebateFor(MasteryPlanV2? masteryPlan)
+    private static IReadOnlyList<CurrencyAmountV2> MasteryNormalRebateFor(MasteryPlanV2? masteryPlan)
     {
         if (masteryPlan is null)
         {
@@ -646,15 +650,44 @@ public static class PlannerV2
             }
         }
 
-        if (masteryPlan.GoldStatus is GoldMasteryStatus.Owned or GoldMasteryStatus.Planned)
+        return SortCurrencyAmounts(totals);
+    }
+
+    private static IReadOnlyList<CurrencyAmountV2> MasteryGoldRebateFor(MasteryPlanV2? masteryPlan)
+    {
+        if (masteryPlan is null)
         {
-            for (var level = currentLevel + 1; level <= plannedLevel; level++)
+            return [];
+        }
+
+        var plannedLevel = Math.Clamp(masteryPlan.PlannedMasteryLevel, 1, 24);
+        var totals = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        if (masteryPlan.GoldStatus == GoldMasteryStatus.Planned)
+        {
+            for (var level = 1; level <= plannedLevel; level++)
             {
                 if (MasteryGoldRewards.TryGetValue(level, out var reward))
                 {
                     Add(totals, Currencies.AircraftParts, reward.aircraftParts);
                     Add(totals, Currencies.Silver, reward.silver);
                 }
+            }
+        }
+
+        return SortCurrencyAmounts(totals);
+    }
+
+    private static IReadOnlyList<CurrencyAmountV2> CombineCurrencyAmounts(
+        params IReadOnlyList<CurrencyAmountV2>[] groups)
+    {
+        var totals = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var group in groups)
+        {
+            foreach (var amount in group)
+            {
+                Add(totals, amount.CurrencyCode, amount.Amount);
             }
         }
 

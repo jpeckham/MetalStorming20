@@ -84,34 +84,54 @@
                         }
                     </div>
                 </div>
-                @if (Controller.ViewModel.Result.HasMasteryRebate)
-                {
-                    <div class="col-md-6">
-                        <div class="border rounded p-3 h-100">
-                            <h3 class="h5">Mastery Rebate</h3>
-                            @foreach (var rebate in Controller.ViewModel.Result.MasteryRebate)
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100" data-testid="net-grind-needed">
+                        <h3 class="h5">Net Grind Needed</h3>
+                        @if (!Controller.ViewModel.Result.HasNetGrindNeeded)
+                        {
+                            <div>None</div>
+                        }
+                        else
+                        {
+                            @foreach (var net in Controller.ViewModel.Result.NetGrindNeeded)
+                            {
+                                <div>@net.DisplayText</div>
+                            }
+                        }
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        <h3 class="h5">Mastery Rebate (Normal)</h3>
+                        @if (!Controller.ViewModel.Result.HasMasteryNormalRebate)
+                        {
+                            <div>None</div>
+                        }
+                        else
+                        {
+                            @foreach (var rebate in Controller.ViewModel.Result.MasteryNormalRebate)
                             {
                                 <div>@rebate.DisplayText</div>
                             }
-                        </div>
+                        }
                     </div>
-                    <div class="col-md-6">
-                        <div class="border rounded p-3 h-100" data-testid="net-grind-needed">
-                            <h3 class="h5">Net Grind Needed</h3>
-                            @if (!Controller.ViewModel.Result.HasNetGrindNeeded)
+                </div>
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        <h3 class="h5">Mastery Rebate (Gold)</h3>
+                        @if (!Controller.ViewModel.Result.HasMasteryGoldRebate)
+                        {
+                            <div>None</div>
+                        }
+                        else
+                        {
+                            @foreach (var rebate in Controller.ViewModel.Result.MasteryGoldRebate)
                             {
-                                <div>None</div>
+                                <div>@rebate.DisplayText</div>
                             }
-                            else
-                            {
-                                @foreach (var net in Controller.ViewModel.Result.NetGrindNeeded)
-                                {
-                                    <div>@net.DisplayText</div>
-                                }
-                            }
-                        </div>
+                        }
                     </div>
-                }
+                </div>
             </div>
 
             <div class="row g-3 mt-1">

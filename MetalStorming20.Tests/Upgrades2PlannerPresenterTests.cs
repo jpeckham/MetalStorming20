@@ -52,7 +52,9 @@ public class Upgrades2PlannerPresenterTests
                         1,
                         [new CurrencyAmountV2(PlannerV2.Currencies.Gold, 269)])
                 ],
-                MasteryRebate: [new CurrencyAmountV2(PlannerV2.Currencies.Silver, 900)],
+                MasteryRebate: [new CurrencyAmountV2(PlannerV2.Currencies.Silver, 1500)],
+                MasteryNormalRebate: [new CurrencyAmountV2(PlannerV2.Currencies.Silver, 900)],
+                MasteryGoldRebate: [new CurrencyAmountV2(PlannerV2.Currencies.Silver, 600)],
                 NetGrindNeeded: [new CurrencyAmountV2(PlannerV2.Currencies.EngineParts, 750)]));
 
         presenter.Present(response);
@@ -62,7 +64,8 @@ public class Upgrades2PlannerPresenterTests
         Assert.True(result.HasWarnings);
         Assert.Equal(["Check target."], result.Warnings);
         Assert.Equal(["SILVER 2,900", "ENGINE_PARTS 950"], result.TotalsRequired.Select(total => total.DisplayText));
-        Assert.Equal(["SILVER 900"], result.MasteryRebate.Select(rebate => rebate.DisplayText));
+        Assert.Equal(["SILVER 900"], result.MasteryNormalRebate.Select(rebate => rebate.DisplayText));
+        Assert.Equal(["SILVER 600"], result.MasteryGoldRebate.Select(rebate => rebate.DisplayText));
         Assert.Equal(["ENGINE_PARTS 750"], result.NetGrindNeeded.Select(net => net.DisplayText));
         Assert.Equal(
             ["", PlannerV2.Currencies.Gold, PlannerV2.Currencies.Silver, PlannerV2.Currencies.AircraftParts],

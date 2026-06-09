@@ -316,11 +316,13 @@ public class PlannerPageTests : PageTest
         await ExpandCostsDetail();
         var goldMasteryStep = Page.GetByRole(AriaRole.Row, new() { NameRegex = new Regex("Gold Mastery.*GOLD 269") });
         await Expect(goldMasteryStep).ToBeVisibleAsync();
-        await Expect(Page.GetByText("Mastery Rebate")).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Mastery Rebate (Normal)", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Mastery Rebate (Gold)", Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText("AIRCRAFT_PARTS 1,000", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText("Net Grind Needed")).ToBeVisibleAsync();
         var netGrindNeeded = Page.GetByTestId("net-grind-needed");
-        await Expect(netGrindNeeded.GetByText("SILVER 1,000", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(netGrindNeeded.GetByText("GOLD 269", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(netGrindNeeded.GetByText("SILVER 1,000", new() { Exact = true })).ToHaveCountAsync(0);
         await Expect(netGrindNeeded.GetByText("AIRCRAFT_PARTS 225", new() { Exact = true })).ToHaveCountAsync(0);
     }
 
@@ -342,7 +344,7 @@ public class PlannerPageTests : PageTest
         await Expect(levelSix).ToHaveAttributeAsync("data-state", "desired");
         await Expect(levelSeven).ToHaveAttributeAsync("data-state", "desired");
         await ExpandCostsDetail();
-        await Expect(Page.GetByText("Mastery Rebate")).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Mastery Rebate (Normal)", Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText("SILVER 900", new() { Exact = true })).ToBeVisibleAsync();
     }
 
