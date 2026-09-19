@@ -170,29 +170,37 @@ public static class PlannerV2
     private static readonly UpgradeCostRowV2[] SystemCosts =
     [
         SystemRow(0, 1, 400, 200, 0, "HIGH"),
-        SystemRow(1, 2, 600, 300, 0, "MEDIUM_HIGH"),
-        SystemRow(2, 3, 900, 450, 0, "HIGH"),
-        SystemRow(3, 4, 1300, 600, 0, "HIGH"),
-        SystemRow(4, 5, 2100, 850, 1, "HIGH"),
-        SystemRow(5, 6, 3300, 1250, 1, "MEDIUM_HIGH"),
-        SystemRow(6, 7, 5000, 2000, 1, "MEDIUM_HIGH"),
-        SystemRow(7, 8, 7000, 3000, 1, "MEDIUM_HIGH")
+        SystemRow(1, 2, 600, 275, 0, "HIGH"),
+        SystemRow(2, 3, 800, 350, 0, "HIGH"),
+        SystemRow(3, 4, 1100, 500, 0, "HIGH"),
+        SystemRow(4, 5, 1500, 675, 1, "HIGH"),
+        SystemRow(5, 6, 2000, 900, 1, "HIGH"),
+        SystemRow(6, 7, 2600, 1100, 1, "HIGH"),
+        SystemRow(7, 8, 3500, 1500, 1, "HIGH")
+    ];
+
+    private static readonly UpgradeCostRowV2[] SecondBranchSystemCosts =
+    [
+        SecondBranchSystemRow(4, 5, 400, 170),
+        SecondBranchSystemRow(5, 6, 525, 220),
+        SecondBranchSystemRow(6, 7, 675, 260),
+        SecondBranchSystemRow(7, 8, 900, 350)
     ];
 
     private static readonly UpgradeCostRowV2[] SpecialCosts =
     [
-        AbilityRow("SPECIAL", 0, 1, 5000, 1),
-        AbilityRow("SPECIAL", 1, 2, 10000, 2),
-        AbilityRow("SPECIAL", 2, 3, 20000, 5)
+        AbilityRow("SPECIAL", 0, 1, 0, 1),
+        AbilityRow("SPECIAL", 1, 2, 0, 2),
+        AbilityRow("SPECIAL", 2, 3, 0, 5)
     ];
 
     private static readonly UpgradeCostRowV2[] PassiveCosts =
     [
-        AbilityRow("PASSIVE", 0, 1, 3000, 1),
-        AbilityRow("PASSIVE", 1, 2, 6000, 2),
-        AbilityRow("PASSIVE", 2, 3, 12000, 3),
-        AbilityRow("PASSIVE", 3, 4, 21000, 5),
-        AbilityRow("PASSIVE", 4, 5, 33000, 8)
+        AbilityRow("PASSIVE", 0, 1, 0, 1),
+        AbilityRow("PASSIVE", 1, 2, 0, 2),
+        AbilityRow("PASSIVE", 2, 3, 0, 3),
+        AbilityRow("PASSIVE", 3, 4, 0, 5),
+        AbilityRow("PASSIVE", 4, 5, 0, 8)
     ];
 
     private static readonly Dictionary<int, (int aircraftParts, int silver)> MasteryNonGoldRewards = new()
@@ -223,7 +231,7 @@ public static class PlannerV2
     private const int GoldMasteryPurchaseCost = 269;
 
     public static IReadOnlyList<UpgradeCostRowV2> AllUpgradeCosts =>
-        AircraftCosts.Concat(SystemCosts).Concat(SpecialCosts).Concat(PassiveCosts).ToArray();
+        AircraftCosts.Concat(SystemCosts).Concat(SecondBranchSystemCosts).Concat(SpecialCosts).Concat(PassiveCosts).ToArray();
 
     public static UpgradeCostRowV2 GetAircraftUpgradeCost(int fromLevel, int toLevel) =>
         AircraftCosts.Single(c => c.FromLevel == fromLevel && c.ToLevel == toLevel);
@@ -255,10 +263,16 @@ public static class PlannerV2
         var totals = new Dictionary<string, int>();
         foreach (var cost in SystemCosts.Where(c => c.FromLevel >= fromLevel && c.ToLevel <= toLevel))
         {
-            var multiplier = mode == BranchOwnershipMode.Both && cost.ToLevel >= 5 ? 2 : 1;
-            Add(totals, Currencies.Silver, cost.SilverCost * multiplier);
-            Add(totals, systemPartCurrencyCode, cost.SystemPartsCost * multiplier);
-            Add(totals, Currencies.AdvancedParts, cost.AdvancedPartsCost * multiplier);
+            Add(totals, Currencies.Silver, cost.SilverCost);
+            Add(totals, systemPartCurrencyCode, cost.SystemPartsCost);
+            Add(totals, Currencies.AdvancedParts, cost.AdvancedPartsCost);
+
+            if (mode == BranchOwnershipMode.Both && cost.ToLevel >= 5)
+            {
+                var secondBranchCost = GetSecondBranchSystemUpgradeCost(cost.FromLevel, cost.ToLevel);
+                Add(totals, Currencies.Silver, secondBranchCost.SilverCost);
+                Add(totals, systemPartCurrencyCode, secondBranchCost.SystemPartsCost);
+            }
         }
 
         return totals;
@@ -335,6 +349,10 @@ public static class PlannerV2
                 {
                     var toLevel = level + 1;
                     var branchCodes = BranchCodesToPurchase(systemTarget, slot, toLevel);
+                    var branchAlreadyOwned = toLevel >= 5 && request.OwnedSystemNodes.Any(n =>
+                        n.SystemSlotId.Equals(systemTarget.SystemSlotId, StringComparison.OrdinalIgnoreCase) &&
+                        n.SystemLevel == toLevel);
+                    var branchesAdded = 0;
                     foreach (var branchCode in branchCodes)
                     {
                         if (IsOwned(request.OwnedSystemNodes, systemTarget.SystemSlotId, toLevel, branchCode))
@@ -342,20 +360,27 @@ public static class PlannerV2
                             continue;
                         }
 
-                        var cost = GetSlotUpgradeCost(slot, level, toLevel);
+                        var useSecondBranchCost = slot.UpgradeKind.Equals("SYSTEM", StringComparison.OrdinalIgnoreCase) &&
+                            toLevel >= 5 &&
+                            (branchAlreadyOwned || branchesAdded > 0);
+                        var cost = useSecondBranchCost
+                            ? GetSecondBranchSystemUpgradeCost(level, toLevel)
+                            : GetSlotUpgradeCost(slot, level, toLevel);
                         steps.Add(new PlanStepV2(
                             steps.Count + 1,
                             slot.AircraftId,
                             PlanStepScope.System,
                             level,
                             toLevel,
-                            [
+                            new CurrencyAmountV2[]
+                            {
                                 new(Currencies.Silver, cost.SilverCost),
                                 new(slot.PartCurrencyCode, cost.SystemPartsCost),
                                 new(Currencies.AdvancedParts, cost.AdvancedPartsCost)
-                            ],
+                            }.Where(amount => amount.Amount > 0).ToArray(),
                             systemTarget.SystemSlotId,
                             branchCode));
+                        branchesAdded++;
                     }
                 }
             }
@@ -760,10 +785,16 @@ public static class PlannerV2
         new("AIRCRAFT", from, to, silver, aircraftParts, 0, 0, "USER_CHART", confidence);
 
     private static UpgradeCostRowV2 SystemRow(int from, int to, int silver, int systemParts, int advancedParts, string confidence) =>
-        new("SYSTEM", from, to, silver, 0, systemParts, advancedParts, "USER_CHART", confidence);
+        new("SYSTEM", from, to, silver, 0, systemParts, advancedParts, "METALSTORM_WIKI", confidence);
+
+    private static UpgradeCostRowV2 SecondBranchSystemRow(int from, int to, int silver, int systemParts) =>
+        new("SYSTEM_SECOND", from, to, silver, 0, systemParts, 0, "METALSTORM_WIKI", "HIGH");
+
+    private static UpgradeCostRowV2 GetSecondBranchSystemUpgradeCost(int fromLevel, int toLevel) =>
+        SecondBranchSystemCosts.Single(c => c.FromLevel == fromLevel && c.ToLevel == toLevel);
 
     private static UpgradeCostRowV2 AbilityRow(string upgradeKind, int from, int to, int silver, int blueprints) =>
-        new(upgradeKind, from, to, silver, 0, blueprints, 0, "USER_SUPPLIED", "HIGH");
+        new(upgradeKind, from, to, silver, 0, blueprints, 0, "CURRENT_GAME", "HIGH");
 
     private static UpgradeCostRowV2[] AbilityCosts(string upgradeKind) =>
         upgradeKind.ToUpperInvariant() switch

@@ -26,18 +26,27 @@ public class PlannerV2CostTests
         Assert.Equal(11200, total[PlannerV2.Currencies.AircraftParts]);
     }
 
-    [Fact]
-    public void SystemCostLookup_ReturnsSeedRows()
+    [Theory]
+    [InlineData(0, 1, 400, 200, 0)]
+    [InlineData(1, 2, 600, 275, 0)]
+    [InlineData(2, 3, 800, 350, 0)]
+    [InlineData(3, 4, 1100, 500, 0)]
+    [InlineData(4, 5, 1500, 675, 1)]
+    [InlineData(5, 6, 2000, 900, 1)]
+    [InlineData(6, 7, 2600, 1100, 1)]
+    [InlineData(7, 8, 3500, 1500, 1)]
+    public void SystemCostLookup_ReturnsCurrentFirstBranchRows(
+        int fromLevel,
+        int toLevel,
+        int silver,
+        int systemParts,
+        int advancedParts)
     {
-        var zeroToOne = PlannerV2.GetSystemUpgradeCost(0, 1);
-        var fourToFive = PlannerV2.GetSystemUpgradeCost(4, 5);
+        var cost = PlannerV2.GetSystemUpgradeCost(fromLevel, toLevel);
 
-        Assert.Equal(400, zeroToOne.SilverCost);
-        Assert.Equal(200, zeroToOne.SystemPartsCost);
-        Assert.Equal(0, zeroToOne.AdvancedPartsCost);
-        Assert.Equal(2100, fourToFive.SilverCost);
-        Assert.Equal(850, fourToFive.SystemPartsCost);
-        Assert.Equal(1, fourToFive.AdvancedPartsCost);
+        Assert.Equal(silver, cost.SilverCost);
+        Assert.Equal(systemParts, cost.SystemPartsCost);
+        Assert.Equal(advancedParts, cost.AdvancedPartsCost);
     }
 
     [Fact]
@@ -45,19 +54,19 @@ public class PlannerV2CostTests
     {
         var total = PlannerV2.SumSystemCosts(0, 8, BranchOwnershipMode.ChosenOnly, PlannerV2.Currencies.EngineParts);
 
-        Assert.Equal(20600, total[PlannerV2.Currencies.Silver]);
-        Assert.Equal(8650, total[PlannerV2.Currencies.EngineParts]);
+        Assert.Equal(12500, total[PlannerV2.Currencies.Silver]);
+        Assert.Equal(5500, total[PlannerV2.Currencies.EngineParts]);
         Assert.Equal(4, total[PlannerV2.Currencies.AdvancedParts]);
     }
 
     [Fact]
-    public void SystemBothBranchesSum_FromZeroToEight_DoublesOnlyBranchLevels()
+    public void SystemBothBranchesSum_FromZeroToEight_UsesReducedSecondBranchRows()
     {
         var total = PlannerV2.SumSystemCosts(0, 8, BranchOwnershipMode.Both, PlannerV2.Currencies.EngineParts);
 
-        Assert.Equal(38000, total[PlannerV2.Currencies.Silver]);
-        Assert.Equal(15750, total[PlannerV2.Currencies.EngineParts]);
-        Assert.Equal(8, total[PlannerV2.Currencies.AdvancedParts]);
+        Assert.Equal(15000, total[PlannerV2.Currencies.Silver]);
+        Assert.Equal(6500, total[PlannerV2.Currencies.EngineParts]);
+        Assert.Equal(4, total[PlannerV2.Currencies.AdvancedParts]);
     }
 
     [Fact]
@@ -65,7 +74,7 @@ public class PlannerV2CostTests
     {
         var total = PlannerV2.SumAbilityCosts("SPECIAL", 0, 3, PlannerV2.Currencies.SpecialAbilityBlueprints);
 
-        Assert.Equal(35000, total[PlannerV2.Currencies.Silver]);
+        Assert.DoesNotContain(PlannerV2.Currencies.Silver, total.Keys);
         Assert.Equal(8, total[PlannerV2.Currencies.SpecialAbilityBlueprints]);
     }
 
@@ -74,7 +83,7 @@ public class PlannerV2CostTests
     {
         var total = PlannerV2.SumAbilityCosts("PASSIVE", 0, 5, PlannerV2.Currencies.PassiveAbilityBlueprints);
 
-        Assert.Equal(75000, total[PlannerV2.Currencies.Silver]);
+        Assert.DoesNotContain(PlannerV2.Currencies.Silver, total.Keys);
         Assert.Equal(19, total[PlannerV2.Currencies.PassiveAbilityBlueprints]);
     }
 }
@@ -225,9 +234,9 @@ public class PlannerV2DependencyTests
         Assert.Equal(PlanStepScope.Aircraft, result.Steps[0].Scope);
         Assert.Equal(5, result.Steps[0].FromLevel);
         Assert.Equal(6, result.Steps[0].ToLevel);
-        Assert.Equal(2900, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
+        Assert.Equal(2800, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
         Assert.Equal(125, result.Deficits.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
-        Assert.Equal(450, result.Deficits.Single(c => c.CurrencyCode == PlannerV2.Currencies.EngineParts).Amount);
+        Assert.Equal(325, result.Deficits.Single(c => c.CurrencyCode == PlannerV2.Currencies.EngineParts).Amount);
     }
 
     [Fact]
@@ -247,9 +256,11 @@ public class PlannerV2DependencyTests
         Assert.Equal(PlanStepScope.Aircraft, result.Steps[0].Scope);
         Assert.Equal(7, result.Steps[0].FromLevel);
         Assert.Equal(8, result.Steps[0].ToLevel);
-        Assert.Equal(36625, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
+        Assert.Equal(1625, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
         Assert.Equal(375, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
         Assert.Equal(8, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.SpecialAbilityBlueprints).Amount);
+        Assert.All(result.Steps.Where(step => step.SystemSlotId == "generic_special"),
+            step => Assert.DoesNotContain(step.Costs, cost => cost.CurrencyCode == PlannerV2.Currencies.Silver));
     }
 
     [Fact]
@@ -269,9 +280,11 @@ public class PlannerV2DependencyTests
         Assert.Equal(PlanStepScope.Aircraft, result.Steps[0].Scope);
         Assert.Equal(11, result.Steps[0].FromLevel);
         Assert.Equal(12, result.Steps[0].ToLevel);
-        Assert.Equal(77950, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
+        Assert.Equal(2950, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
         Assert.Equal(650, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
         Assert.Equal(19, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.PassiveAbilityBlueprints).Amount);
+        Assert.All(result.Steps.Where(step => step.SystemSlotId == "generic_passive"),
+            step => Assert.DoesNotContain(step.Costs, cost => cost.CurrencyCode == PlannerV2.Currencies.Silver));
     }
 
     [Fact]
@@ -309,13 +322,44 @@ public class PlannerV2DependencyTests
     }
 
     [Fact]
-    public void Plan_BothModeFromFourToFive_DoublesBranchLevelCost()
+    public void Plan_BothModeFromFourToFive_UsesReducedSecondBranchCost()
     {
         var total = PlannerV2.SumSystemCosts(4, 5, BranchOwnershipMode.Both, PlannerV2.Currencies.EngineParts);
 
-        Assert.Equal(4200, total[PlannerV2.Currencies.Silver]);
-        Assert.Equal(1700, total[PlannerV2.Currencies.EngineParts]);
-        Assert.Equal(2, total[PlannerV2.Currencies.AdvancedParts]);
+        Assert.Equal(1900, total[PlannerV2.Currencies.Silver]);
+        Assert.Equal(845, total[PlannerV2.Currencies.EngineParts]);
+        Assert.Equal(1, total[PlannerV2.Currencies.AdvancedParts]);
+    }
+
+    [Fact]
+    public void Plan_SecondBranchAtOwnedLevel_UsesReducedCostWithoutAdvancedParts()
+    {
+        var ownedNodes = Enumerable.Range(1, 4)
+            .Select(level => new OwnedSystemNodeV2("f106_engines_main", level, null))
+            .Append(new OwnedSystemNodeV2("f106_engines_main", 5, "A"))
+            .ToArray();
+        var result = PlannerV2.Plan(new PlannerRequestV2(
+            Aircraft: [new AircraftStateV2("f106_delta_dart", true, 12)],
+            OwnedSystemNodes: ownedNodes,
+            EquippedSystemBranches: [new EquippedSystemBranchV2("f106_engines_main", 5, "A")],
+            ResourceBalances: [],
+            AircraftTargets: [new AircraftTargetV2("f106_delta_dart", 12)],
+            SystemTargets:
+            [
+                new SystemTargetV2(
+                    "f106_engines_main",
+                    5,
+                    BranchOwnershipMode.ChosenOnly,
+                    new Dictionary<int, string> { [5] = "B" },
+                    new Dictionary<int, IReadOnlyList<string>> { [5] = ["B"] })
+            ],
+            SystemSlots: PlannerV2.DefaultSystemSlots));
+
+        Assert.Empty(result.Warnings);
+        var step = Assert.Single(result.Steps);
+        Assert.Equal(400, step.Costs.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
+        Assert.Equal(170, step.Costs.Single(c => c.CurrencyCode == PlannerV2.Currencies.EngineParts).Amount);
+        Assert.DoesNotContain(step.Costs, c => c.CurrencyCode == PlannerV2.Currencies.AdvancedParts);
     }
 
     [Fact]
@@ -835,10 +879,10 @@ public class PlannerV2DependencyTests
             step => Assert.Equal("f5_tiger_ii", step.AircraftId));
         Assert.Equal(4400, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
         Assert.Equal(675, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
-        Assert.Equal(700, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.EngineParts).Amount);
+        Assert.Equal(675, result.TotalsRequired.Single(c => c.CurrencyCode == PlannerV2.Currencies.EngineParts).Amount);
         Assert.Equal(1900, result.Deficits.Single(c => c.CurrencyCode == PlannerV2.Currencies.Silver).Amount);
         Assert.Equal(475, result.Deficits.Single(c => c.CurrencyCode == PlannerV2.Currencies.AircraftParts).Amount);
-        Assert.Equal(100, result.Deficits.Single(c => c.CurrencyCode == PlannerV2.Currencies.EngineParts).Amount);
+        Assert.Equal(75, result.Deficits.Single(c => c.CurrencyCode == PlannerV2.Currencies.EngineParts).Amount);
     }
 }
 
@@ -869,9 +913,10 @@ public class Upgrades2CatalogFiles
 
         using var costs = JsonDocument.Parse(File.ReadAllText(Path.Combine(dataRoot, "upgrade-costs.json")));
         var rows = costs.RootElement.EnumerateArray().ToList();
-        Assert.Equal(35, rows.Count);
+        Assert.Equal(39, rows.Count);
         Assert.Equal(19, rows.Count(r => r.GetProperty("upgradeKind").GetString() == "AIRCRAFT"));
         Assert.Equal(8, rows.Count(r => r.GetProperty("upgradeKind").GetString() == "SYSTEM"));
+        Assert.Equal(4, rows.Count(r => r.GetProperty("upgradeKind").GetString() == "SYSTEM_SECOND"));
         Assert.Equal(3, rows.Count(r => r.GetProperty("upgradeKind").GetString() == "SPECIAL"));
         Assert.Equal(5, rows.Count(r => r.GetProperty("upgradeKind").GetString() == "PASSIVE"));
 
