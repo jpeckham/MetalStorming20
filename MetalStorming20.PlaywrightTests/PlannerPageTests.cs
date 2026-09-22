@@ -26,7 +26,10 @@ public class PlannerPageTests : PageTest
     {
         var button = systemRow.GetByRole(AriaRole.Button, new() { Name = node });
         await button.ClickAsync();
-        await button.ClickAsync();
+        if (await button.GetAttributeAsync("data-state") != "desired")
+        {
+            await button.ClickAsync();
+        }
     }
 
     private static async Task MarkSystemNodeAsHas(ILocator systemRow, string node)
@@ -41,7 +44,10 @@ public class PlannerPageTests : PageTest
             .GetByRole(AriaRole.Button, new() { Name = level.ToString(), Exact = true });
 
         await masteryLevel.ClickAsync();
-        await masteryLevel.ClickAsync();
+        if (await masteryLevel.GetAttributeAsync("data-state") != "desired")
+        {
+            await masteryLevel.ClickAsync();
+        }
     }
 
     private async Task MarkGoldMasteryAsPlanned()
@@ -87,9 +93,9 @@ public class PlannerPageTests : PageTest
         await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "1" })).ToBeVisibleAsync();
         await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "5A" })).ToBeVisibleAsync();
         await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "5B" })).ToBeVisibleAsync();
-        await MarkSystemNodeAsDesired(engines, "1");
-        await MarkSystemNodeAsDesired(engines, "2");
         await MarkSystemNodeAsDesired(engines, "3");
+        await MarkSystemNodeAsDesired(engines, "2");
+        await MarkSystemNodeAsDesired(engines, "1");
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Costs Summary" })).ToBeVisibleAsync();
         await ExpandCostsDetail();
@@ -116,9 +122,9 @@ public class PlannerPageTests : PageTest
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Costs Summary" })).ToBeVisibleAsync();
 
         var engines = Page.GetByTestId("system-engines");
-        await MarkSystemNodeAsDesired(engines, "1");
-        await MarkSystemNodeAsDesired(engines, "2");
         await MarkSystemNodeAsDesired(engines, "3");
+        await MarkSystemNodeAsDesired(engines, "2");
+        await MarkSystemNodeAsDesired(engines, "1");
 
         await ExpandCostsDetail();
         await Expect(Page.GetByText("SILVER 2,800").First).ToBeVisibleAsync();
@@ -134,9 +140,9 @@ public class PlannerPageTests : PageTest
         await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
 
         var engines = Page.GetByTestId("system-engines");
-        await MarkSystemNodeAsDesired(engines, "1");
-        await MarkSystemNodeAsDesired(engines, "2");
         await MarkSystemNodeAsDesired(engines, "3");
+        await MarkSystemNodeAsDesired(engines, "2");
+        await MarkSystemNodeAsDesired(engines, "1");
 
         var summary = Page.GetByTestId("costs-summary");
         await Expect(summary).ToBeVisibleAsync();
@@ -231,6 +237,69 @@ public class PlannerPageTests : PageTest
     }
 
     [TestMethod]
+    public async Task SpecialMiddleLevelSkipsUnavailableOffStateWhenLaterLevelIsDesired()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        var special = Page.GetByTestId("system-special");
+        var levelOne = special.GetByRole(AriaRole.Button, new() { Name = "1", Exact = true });
+        var levelTwo = special.GetByRole(AriaRole.Button, new() { Name = "2", Exact = true });
+        var levelThree = special.GetByRole(AriaRole.Button, new() { Name = "3", Exact = true });
+
+        await levelThree.ClickAsync();
+        await levelThree.ClickAsync();
+        await levelTwo.ClickAsync();
+        await Expect(levelOne).ToHaveAttributeAsync("data-state", "has");
+        await Expect(levelTwo).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(levelThree).ToHaveAttributeAsync("data-state", "desired");
+
+        await levelTwo.ClickAsync();
+        await Expect(levelTwo).ToHaveAttributeAsync("data-state", "has");
+
+        await levelTwo.ClickAsync();
+        await Expect(levelTwo).ToHaveAttributeAsync("data-state", "desired");
+    }
+
+    [TestMethod]
+    public async Task BranchAlternatesPreserveDownstreamSelectionsWhileMaintainingOwnedPath()
+    {
+        await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await Page.EvaluateAsync("localStorage.clear()");
+        await Page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        var fuselage = Page.GetByTestId("system-fuselage");
+        var levelSixA = fuselage.GetByRole(AriaRole.Button, new() { Name = "6A", Exact = true });
+        var levelSixB = fuselage.GetByRole(AriaRole.Button, new() { Name = "6B", Exact = true });
+        var levelSevenA = fuselage.GetByRole(AriaRole.Button, new() { Name = "7A", Exact = true });
+
+        await MarkSystemNodeAsHas(fuselage, "6A");
+        await MarkSystemNodeAsHas(fuselage, "6B");
+        await MarkSystemNodeAsHas(fuselage, "7A");
+
+        await levelSixA.ClickAsync();
+        await Expect(levelSixA).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(levelSixB).ToHaveAttributeAsync("data-state", "has");
+        await Expect(levelSevenA).ToHaveAttributeAsync("data-state", "has");
+
+        await levelSixB.ClickAsync();
+        await Expect(levelSixA).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(levelSixB).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(levelSevenA).ToHaveAttributeAsync("data-state", "desired");
+
+        await levelSixA.ClickAsync();
+        await Expect(levelSixA).ToHaveAttributeAsync("data-state", "off");
+        await Expect(levelSixB).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(levelSevenA).ToHaveAttributeAsync("data-state", "desired");
+
+        await levelSixB.ClickAsync();
+        await Expect(levelSixA).ToHaveAttributeAsync("data-state", "off");
+        await Expect(levelSixB).ToHaveAttributeAsync("data-state", "has");
+        await Expect(levelSevenA).ToHaveAttributeAsync("data-state", "desired");
+    }
+
+    [TestMethod]
     public async Task Upgrades2AircraftLevelButtonsTrackHasAndDesiredStates()
     {
         await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
@@ -256,7 +325,7 @@ public class PlannerPageTests : PageTest
     }
 
     [TestMethod]
-    public async Task Upgrades2AircraftSelectingNextLevelDoesNotConvertDesiredPrerequisiteToOwned()
+    public async Task Upgrades2AircraftSelectingOwnedNextLevelPromotesDesiredPrerequisiteToOwned()
     {
         await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
         await Page.EvaluateAsync("localStorage.clear()");
@@ -270,11 +339,8 @@ public class PlannerPageTests : PageTest
         await levelSix.ClickAsync();
         await levelSeven.ClickAsync();
 
-        await Expect(levelSix).ToHaveAttributeAsync("data-state", "desired");
-        await Expect(levelSeven).ToHaveAttributeAsync("data-state", "desired");
-        await ExpandCostsDetail();
-        await Expect(Page.GetByText("Aircraft 5->6")).ToBeVisibleAsync();
-        await Expect(Page.GetByText("Aircraft 6->7")).ToBeVisibleAsync();
+        await Expect(levelSix).ToHaveAttributeAsync("data-state", "has");
+        await Expect(levelSeven).ToHaveAttributeAsync("data-state", "has");
     }
 
     [TestMethod]
@@ -327,7 +393,7 @@ public class PlannerPageTests : PageTest
     }
 
     [TestMethod]
-    public async Task Upgrades2MasterySelectingNextLevelDoesNotConvertDesiredPrerequisiteToOwned()
+    public async Task Upgrades2MasterySelectingOwnedNextLevelPromotesDesiredPrerequisiteToOwned()
     {
         await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
         await Page.EvaluateAsync("localStorage.clear()");
@@ -341,11 +407,8 @@ public class PlannerPageTests : PageTest
         await levelSix.ClickAsync();
         await levelSeven.ClickAsync();
 
-        await Expect(levelSix).ToHaveAttributeAsync("data-state", "desired");
-        await Expect(levelSeven).ToHaveAttributeAsync("data-state", "desired");
-        await ExpandCostsDetail();
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Mastery Rebate (Normal)", Exact = true })).ToBeVisibleAsync();
-        await Expect(Page.GetByText("SILVER 900", new() { Exact = true }).First).ToBeVisibleAsync();
+        await Expect(levelSix).ToHaveAttributeAsync("data-state", "has");
+        await Expect(levelSeven).ToHaveAttributeAsync("data-state", "has");
     }
 
     [TestMethod]
@@ -627,7 +690,7 @@ public class PlannerPageTests : PageTest
     }
 
     [TestMethod]
-    public async Task Upgrades2SelectingNextBranchLevelDoesNotConvertDesiredPrerequisiteToOwned()
+    public async Task Upgrades2SelectingOwnedNextBranchLevelPromotesDesiredPrerequisiteToOwned()
     {
         await Page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
         await Page.EvaluateAsync("localStorage.clear()");
@@ -640,7 +703,7 @@ public class PlannerPageTests : PageTest
 
         await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "5A" })).ToHaveAttributeAsync("data-state", "has");
         await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "6A" })).ToHaveAttributeAsync("data-state", "has");
-        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "7A" })).ToHaveAttributeAsync("data-state", "desired");
+        await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "7A" })).ToHaveAttributeAsync("data-state", "has");
         await Expect(engines.GetByRole(AriaRole.Button, new() { Name = "8A" })).ToHaveAttributeAsync("data-state", "desired");
     }
 }

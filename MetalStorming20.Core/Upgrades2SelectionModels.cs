@@ -1,5 +1,34 @@
 namespace MetalStorming20.Core;
 
+internal static class Upgrades2SelectionCycle
+{
+    private static readonly Upgrades2NodeSelectionState[] States =
+    [
+        Upgrades2NodeSelectionState.Off,
+        Upgrades2NodeSelectionState.Owned,
+        Upgrades2NodeSelectionState.Desired
+    ];
+
+    public static Upgrades2NodeSelectionState Next(
+        Upgrades2NodeSelectionState current,
+        bool canBeOff,
+        bool canBeOwned)
+    {
+        var currentIndex = Array.IndexOf(States, current);
+        for (var offset = 1; offset <= States.Length; offset++)
+        {
+            var candidate = States[(currentIndex + offset) % States.Length];
+            if ((candidate != Upgrades2NodeSelectionState.Off || canBeOff) &&
+                (candidate != Upgrades2NodeSelectionState.Owned || canBeOwned))
+            {
+                return candidate;
+            }
+        }
+
+        return current;
+    }
+}
+
 public sealed class Upgrades2AircraftLevelPlan
 {
     public Dictionary<int, Upgrades2NodeSelectionState> LevelStates { get; } = [];
@@ -46,13 +75,10 @@ public sealed class Upgrades2AircraftLevelPlan
     public void Cycle(int level)
     {
         level = Math.Clamp(level, 1, 20);
-        var nextState = StateFor(level) switch
-        {
-            Upgrades2NodeSelectionState.Off when HasDesiredPrerequisite(level) => Upgrades2NodeSelectionState.Desired,
-            Upgrades2NodeSelectionState.Off => Upgrades2NodeSelectionState.Owned,
-            Upgrades2NodeSelectionState.Owned => Upgrades2NodeSelectionState.Desired,
-            _ => Upgrades2NodeSelectionState.Off
-        };
+        var nextState = Upgrades2SelectionCycle.Next(
+            StateFor(level),
+            !LevelStates.Any(entry => entry.Key > level && IsTarget(entry.Key)),
+            true);
 
         if (nextState == Upgrades2NodeSelectionState.Off)
         {
@@ -61,6 +87,14 @@ public sealed class Upgrades2AircraftLevelPlan
         else
         {
             LevelStates[level] = nextState;
+        }
+
+        if (nextState == Upgrades2NodeSelectionState.Owned)
+        {
+            for (var prerequisiteLevel = 1; prerequisiteLevel < level; prerequisiteLevel++)
+            {
+                LevelStates[prerequisiteLevel] = Upgrades2NodeSelectionState.Owned;
+            }
         }
 
         NormalizeSelection();
@@ -86,6 +120,7 @@ public sealed class Upgrades2AircraftLevelPlan
 
     public void NormalizeSelection()
     {
+        DemoteOwnedLevelsAfterFirstDesired();
         var targetLevel = TargetAircraftLevel;
         var currentLevel = CurrentAircraftLevel;
 
@@ -119,17 +154,21 @@ public sealed class Upgrades2AircraftLevelPlan
         }
     }
 
-    private bool HasDesiredPrerequisite(int level)
+    private void DemoteOwnedLevelsAfterFirstDesired()
     {
-        for (var prerequisiteLevel = 1; prerequisiteLevel < level; prerequisiteLevel++)
-        {
-            if (StateFor(prerequisiteLevel) == Upgrades2NodeSelectionState.Desired)
-            {
-                return true;
-            }
-        }
+        var firstDesiredLevel = LevelStates
+            .Where(entry => entry.Value == Upgrades2NodeSelectionState.Desired)
+            .Select(entry => entry.Key)
+            .DefaultIfEmpty(int.MaxValue)
+            .Min();
 
-        return false;
+        foreach (var level in LevelStates
+            .Where(entry => entry.Key > firstDesiredLevel && entry.Value == Upgrades2NodeSelectionState.Owned)
+            .Select(entry => entry.Key)
+            .ToArray())
+        {
+            LevelStates[level] = Upgrades2NodeSelectionState.Desired;
+        }
     }
 }
 
@@ -179,13 +218,10 @@ public sealed class Upgrades2MasteryLevelPlan
     public void Cycle(int level)
     {
         level = Math.Clamp(level, 1, 24);
-        var nextState = StateFor(level) switch
-        {
-            Upgrades2NodeSelectionState.Off when HasDesiredPrerequisite(level) => Upgrades2NodeSelectionState.Desired,
-            Upgrades2NodeSelectionState.Off => Upgrades2NodeSelectionState.Owned,
-            Upgrades2NodeSelectionState.Owned => Upgrades2NodeSelectionState.Desired,
-            _ => Upgrades2NodeSelectionState.Off
-        };
+        var nextState = Upgrades2SelectionCycle.Next(
+            StateFor(level),
+            !LevelStates.Any(entry => entry.Key > level && IsTarget(entry.Key)),
+            true);
 
         if (nextState == Upgrades2NodeSelectionState.Off)
         {
@@ -194,6 +230,14 @@ public sealed class Upgrades2MasteryLevelPlan
         else
         {
             LevelStates[level] = nextState;
+        }
+
+        if (nextState == Upgrades2NodeSelectionState.Owned)
+        {
+            for (var prerequisiteLevel = 1; prerequisiteLevel < level; prerequisiteLevel++)
+            {
+                LevelStates[prerequisiteLevel] = Upgrades2NodeSelectionState.Owned;
+            }
         }
 
         NormalizeSelection();
@@ -219,6 +263,7 @@ public sealed class Upgrades2MasteryLevelPlan
 
     public void NormalizeSelection()
     {
+        DemoteOwnedLevelsAfterFirstDesired();
         var plannedLevel = PlannedMasteryLevel;
         var currentLevel = CurrentMasteryLevel;
 
@@ -252,17 +297,21 @@ public sealed class Upgrades2MasteryLevelPlan
         }
     }
 
-    private bool HasDesiredPrerequisite(int level)
+    private void DemoteOwnedLevelsAfterFirstDesired()
     {
-        for (var prerequisiteLevel = 1; prerequisiteLevel < level; prerequisiteLevel++)
-        {
-            if (StateFor(prerequisiteLevel) == Upgrades2NodeSelectionState.Desired)
-            {
-                return true;
-            }
-        }
+        var firstDesiredLevel = LevelStates
+            .Where(entry => entry.Value == Upgrades2NodeSelectionState.Desired)
+            .Select(entry => entry.Key)
+            .DefaultIfEmpty(int.MaxValue)
+            .Min();
 
-        return false;
+        foreach (var level in LevelStates
+            .Where(entry => entry.Key > firstDesiredLevel && entry.Value == Upgrades2NodeSelectionState.Owned)
+            .Select(entry => entry.Key)
+            .ToArray())
+        {
+            LevelStates[level] = Upgrades2NodeSelectionState.Desired;
+        }
     }
 }
 
@@ -315,12 +364,10 @@ public sealed class Upgrades2SystemPlanRow
     public void Cycle(int level, string? branchCode)
     {
         var key = NodeKey(level, branchCode);
-        var nextState = StateFor(key) switch
-        {
-            Upgrades2NodeSelectionState.Off => Upgrades2NodeSelectionState.Owned,
-            Upgrades2NodeSelectionState.Owned => Upgrades2NodeSelectionState.Desired,
-            _ => Upgrades2NodeSelectionState.Off
-        };
+        var nextState = Upgrades2SelectionCycle.Next(
+            StateFor(key),
+            CanBeOff(level, branchCode),
+            true);
 
         if (nextState == Upgrades2NodeSelectionState.Off)
         {
@@ -331,10 +378,7 @@ public sealed class Upgrades2SystemPlanRow
             NodeStates[key] = nextState;
         }
 
-        if (UsesBranches &&
-            level >= 5 &&
-            nextState is Upgrades2NodeSelectionState.Owned or Upgrades2NodeSelectionState.Desired &&
-            !HasSelectedPrerequisitePath(level))
+        if (nextState == Upgrades2NodeSelectionState.Owned)
         {
             MarkPrerequisitePathAsOwned(level, branchCode);
         }
@@ -361,6 +405,8 @@ public sealed class Upgrades2SystemPlanRow
                 }
             }
         }
+
+        DemoteOwnedNodesWithoutOwnedPrerequisitePath();
     }
 
     public void LoadState(Upgrades2SavedSystemPlan savedSystem)
@@ -374,6 +420,7 @@ public sealed class Upgrades2SystemPlanRow
 
         if (savedSystem.NodeStates is null)
         {
+            NormalizeSelection();
             return;
         }
 
@@ -384,6 +431,8 @@ public sealed class Upgrades2SystemPlanRow
                     ? Upgrades2NodeSelectionState.Owned
                     : Upgrades2NodeSelectionState.Desired;
         }
+
+        NormalizeSelection();
     }
 
     public Upgrades2SystemPlanInput ToPlannerInput() =>
@@ -414,29 +463,56 @@ public sealed class Upgrades2SystemPlanRow
         }
     }
 
-    private bool HasSelectedPrerequisitePath(int level)
+    private bool CanBeOff(int level, string? branchCode)
     {
-        if (level <= 1)
+        var hasLaterSelection = TargetNodes.Any(node => ParseLevel(node) > level);
+        if (!hasLaterSelection)
         {
             return true;
         }
 
-        for (var trunkLevel = 1; trunkLevel <= Math.Min(level - 1, 4); trunkLevel++)
+        if (!UsesBranches || level < 5 || branchCode is null)
         {
-            if (!IsTarget(trunkLevel, null))
+            return false;
+        }
+
+        var alternateBranch = branchCode.Equals("A", StringComparison.OrdinalIgnoreCase) ? "B" : "A";
+        return IsTarget(level, alternateBranch);
+    }
+
+    private void DemoteOwnedNodesWithoutOwnedPrerequisitePath()
+    {
+        foreach (var node in NodeStates
+            .Where(entry => entry.Value == Upgrades2NodeSelectionState.Owned)
+            .OrderBy(entry => ParseLevel(entry.Key))
+            .ToArray())
+        {
+            if (!HasOwnedPrerequisitePath(ParseLevel(node.Key)))
+            {
+                NodeStates[node.Key] = Upgrades2NodeSelectionState.Desired;
+            }
+        }
+    }
+
+    private bool HasOwnedPrerequisitePath(int level)
+    {
+        for (var trunkLevel = 1; trunkLevel <= Math.Min(level - 1, UsesBranches ? 4 : MaxSystemLevel); trunkLevel++)
+        {
+            if (StateFor(trunkLevel, null) != Upgrades2NodeSelectionState.Owned)
             {
                 return false;
             }
         }
 
-        if (level <= 5)
+        if (!UsesBranches || level <= 5)
         {
             return true;
         }
 
         for (var branchLevel = 5; branchLevel < level; branchLevel++)
         {
-            if (!IsTarget(branchLevel, "A") && !IsTarget(branchLevel, "B"))
+            if (StateFor(branchLevel, "A") != Upgrades2NodeSelectionState.Owned &&
+                StateFor(branchLevel, "B") != Upgrades2NodeSelectionState.Owned)
             {
                 return false;
             }
@@ -447,12 +523,12 @@ public sealed class Upgrades2SystemPlanRow
 
     private void MarkPrerequisitePathAsOwned(int level, string? branchCode)
     {
-        for (var trunkLevel = 1; trunkLevel <= Math.Min(level - 1, 4); trunkLevel++)
+        for (var trunkLevel = 1; trunkLevel <= Math.Min(level - 1, UsesBranches ? 4 : MaxSystemLevel); trunkLevel++)
         {
             NodeStates[NodeKey(trunkLevel, null)] = Upgrades2NodeSelectionState.Owned;
         }
 
-        if (level <= 5)
+        if (!UsesBranches || level <= 5)
         {
             return;
         }
